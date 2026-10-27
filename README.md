@@ -1,8 +1,8 @@
 # EGX MCP Server
 
-An MCP (Model Context Protocol) server that gives AI assistants read access to Egyptian Exchange (EGX) market data: stock quotes and indices today, with price history, funds, dividends, financial figures, gold, silver and the dollar rate coming later. It runs as one Cloudflare Worker on the free tier. Anyone with a Google account can sign in and use it from Claude, ChatGPT or Cursor.
+An MCP (Model Context Protocol) server that gives AI assistants read access to Egyptian Exchange (EGX) market data: stock quotes and indices today, with price history, funds, dividends, financial figures, gold, silver and the dollar rate coming later. It runs as one Cloudflare Worker on the free tier. Anyone with a Google account can sign in, create an API key and use it from Claude (custom connector), Claude Code, ChatGPT or Cursor.
 
-Status: the MVP runs at <https://egx-mcp.essawy.workers.dev/>, and no permission from EGX or EGID to share the data has been obtained yet. See [Data sources and limits](#data-sources-and-limits).
+Status: the MVP runs at <https://egx-mcp.essawy.workers.dev/> (see also the [privacy policy](https://egx-mcp.essawy.workers.dev/privacy) and the [terms of use](https://egx-mcp.essawy.workers.dev/terms)), and no permission from EGX or EGID to share the data has been obtained yet. See [Data sources and limits](#data-sources-and-limits).
 
 Current build (MVP): only 5 tools are enabled (`search`, `get_quotes`, `get_market_overview`, `get_indices` and `get_daily_summary`). Sign-in with Google from Claude and ChatGPT is not available yet (coming later), so connect with an API key from the dashboard. The `admin` tool, portfolio, price levels, funds, metals and the other tools are not built yet, so the owner tasks, the holiday table and the notices described below are planned. Parts of this guide that describe later work are marked "(coming later)".
 
@@ -56,23 +56,21 @@ Permission: EGX and EGID have not yet given permission to share this data. The s
 
 The server address is `https://egx-mcp.essawy.workers.dev` and the MCP address is `https://egx-mcp.essawy.workers.dev/mcp`. If you deploy your own copy, use your own address (`<PUBLIC_ORIGIN>`) instead, see [Install and deploy from a clean Windows machine](#install-and-deploy-from-a-clean-windows-machine).
 
-Sign in with Google (no key needed). This is not available yet (coming later): connecting with sign-in does not work in this build, and a client may fail before it reaches any page because no client registration endpoint exists yet. Use an API key for now (Claude Code can send one, see below).
+Claude custom connectors are supported with an API key. This build has no sign-in from Claude yet, so the connector sends your key in a request header:
 
-1. In Claude, open the connectors settings and choose to add a custom connector.
-2. Enter a name (for example `EGX`) and the address `https://egx-mcp.essawy.workers.dev/mcp`, then save.
-3. Choose to connect. A Google sign-in page opens. Sign in with your Google account.
-4. Read the consent page (it repeats that the data is delayed and informational) and approve.
+1. Open <https://egx-mcp.essawy.workers.dev/dashboard> in a browser and sign in with Google.
+2. Create a key with a name. The full key (it starts with `egx_`) is shown once. Copy it now; after you reload, only its prefix remains. You can have up to 3 active keys, and you can revoke a key on the same page.
+3. In Claude, open the connectors settings and choose to add a custom connector.
+4. Enter a name (for example `EGX`) and the address `https://egx-mcp.essawy.workers.dev/mcp`. Choose no sign-in, then in the request headers field add `Authorization` with the value `Bearer <your key>`, and save.
 5. Start a chat, enable the connector, and ask "What is the price of CIB?".
 
-Alternatively, use an API key:
+Claude Code sends the same header:
 
-1. Open `https://egx-mcp.essawy.workers.dev/dashboard` in a browser and sign in with Google.
-2. Create a key with a name. The full key (it starts with `egx_`) is shown once. Copy it now; after you reload, only its prefix remains. You can have up to 3 active keys, and you can revoke a key on the same page.
-3. In a client that lets you set request headers, send `Authorization: Bearer <your key>` to `https://egx-mcp.essawy.workers.dev/mcp`. Claude.ai and Claude Desktop custom connectors take no headers, so they cannot use a key. Claude Code can:
+```text
+claude mcp add --transport http egx https://egx-mcp.essawy.workers.dev/mcp --header "Authorization: Bearer <your key>"
+```
 
-   ```text
-   claude mcp add --transport http egx https://egx-mcp.essawy.workers.dev/mcp --header "Authorization: Bearer <your key>"
-   ```
+Sign in with Google from Claude (no key needed) is coming later. It does not work in this build, and a client may fail before it reaches any page because no client registration endpoint exists yet.
 
 ## Connect from ChatGPT
 
