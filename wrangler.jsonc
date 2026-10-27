@@ -1,0 +1,42 @@
+{
+  "name": "egx-mcp",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-10-01",
+  "compatibility_flags": ["nodejs_compat"],
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "egx",
+      "migrations_dir": "migrations"
+    }
+  ],
+  "kv_namespaces": [
+    { "binding": "DATA" },
+    { "binding": "OAUTH_KV" }
+  ],
+  "ratelimits": [
+    {
+      "name": "RATE_LIMITER",
+      "namespace_id": "1001",
+      "simple": { "limit": 10, "period": 60 }
+    }
+  ],
+  "triggers": {
+    "crons": ["* 6-12 * * SUN-THU", "30 12,13 * * SUN-THU", "0 16 * * *", "0 1 * * SAT"]
+  },
+  "vars": {
+    "GLOBAL_DAILY_CALLS": "15000",
+    "GLOBAL_DAILY_ROWS_READ": "3500000",
+    "OAUTH_DAILY_KV_WRITES": "600",
+    "USER_DAILY_CALLS": "100",
+    "OWNER_EMAILS": "",
+    "UNLIMITED_EMAILS": "",
+    "STOCK_PROVIDERS": "egx,tradingview",
+    "SNAPSHOT_EVERY_MINUTES": "1",
+    "BACKFILL_MAX_ROWS_PER_DAY": "36000",
+    "ADJUST_MAX_ROWS_PER_DAY": "10000",
+    "ADJUST_MAX_ACTIONS_PER_RUN": "2",
+    "PERSONAL_DAILY_ROWS": "5000",
+    "PUBLIC_ORIGIN": ""
+  }
+}

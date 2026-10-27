@@ -1,0 +1,5 @@
+export const D1_DAILY_ROWS_WRITTEN = 100000;
+export const JOBS_D1_ROWS_RESERVE = 16000;
+export const D1_WRITE_HEADROOM = 3000;
+export const ACCOUNTING_ROWS_PER_CALL = 2;
+export const ADJUST_BATCH_OVERHEAD_ROWS = 8;

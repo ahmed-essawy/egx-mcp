@@ -1,0 +1,283 @@
+# EGX MCP Server
+
+An MCP (Model Context Protocol) server that gives AI assistants read access to Egyptian Exchange (EGX) market data: stock quotes and indices today, with price history, funds, dividends, financial figures, gold, silver and the dollar rate coming later. It runs as one Cloudflare Worker on the free tier. Anyone with a Google account can sign in and use it from Claude, ChatGPT or Cursor.
+
+Status: the server is not yet deployed, and no permission from EGX or EGID to share the data has been obtained yet. See [Data sources and limits](#data-sources-and-limits).
+
+Current build (MVP): only 5 tools are enabled (`search`, `get_quotes`, `get_market_overview`, `get_indices` and `get_daily_summary`). Sign-in with Google from Claude and ChatGPT is not available yet (coming later), so connect with an API key from the dashboard. The `admin` tool, portfolio, price levels, funds, metals and the other tools are not built yet, so the owner tasks, the holiday table and the notices described below are planned. Parts of this guide that describe later work are marked "(coming later)".
+
+## Overview
+
+What the server does:
+
+- Answers questions about EGX stocks and EGX indices. Mutual funds, dividends and corporate actions, company financial figures, gold and silver prices in Egypt and worldwide, and the USD/EGP rate are coming later.
+- Keeps a personal portfolio and price levels for each signed-in user, and reports what changed since a given time (coming later).
+- Gives the owner an `admin` tool for notices, the holiday table, inflation figures and corporate action ratios (coming later).
+
+Data coverage:
+
+- Stocks: every active EGX symbol in the server directory (ticker, ISIN, Arabic or English name all work as input), with delayed quotes during the session (end-of-day history coming later).
+- Indices: EGX30, EGX30CAPPED, EGX70EWI and EGX100EWI. EGX30USD is reported as not available unless a source supplies it.
+- Funds (coming later): Egyptian funds listed by Mubasher, with daily NAV history that grows from the day the server starts collecting.
+- Metals and currency (coming later): Egypt gold (18K, 21K, 24K) and silver (925, 999) buy and sell prices per gram, global gold and silver in USD per ounce, and the USD/EGP market rate.
+
+Important notice:
+
+- All market data is delayed (about 15 minutes during the session) and unofficial.
+- All data is informational only. It is not investment advice, and the server never tells you to buy, sell or hold.
+- Every answer carries a label, the data time, the source and a notice saying so.
+
+## Data sources and limits
+
+| Source | What it provides |
+|---|---|
+| EGX website (www.egx.com.eg) | Intended first choice for stock quotes. Not reachable from the owner's desktop during research (every connection was reset), so it is used only if a probe from the deployed Worker succeeds. |
+| TradingView scanner | Delayed stock quotes (15 minutes), ISIN, index values and the share counts used by the symbol directory sync (dividends, financial figures, USD/EGP and global gold and silver are coming later). |
+| Mubasher | Backup stock quotes, listing master, Arabic names and sector (funds and NAVs, corporate action events and the history files are coming later). The end-of-day symbol directory sync needs both TradingView and Mubasher: if either fails, the directory is not updated. |
+| iSagha | Coming later: Egypt gold and silver buy and sell prices per gram. The page has no timestamp, so the data time is the fetch time. |
+| Owner-entered | Coming later: monthly inflation (CAPMAS urban CPI) and bonus, split and reverse split ratios, entered with the `admin` tool. |
+
+The order of stock sources is the `STOCK_PROVIDERS` setting (default `egx,tradingview`). The `egx` source is not built yet (coming later) and this build ignores it. With the default setting TradingView is therefore the only stock source, with no backup and no `source_switched` notice. To have Mubasher as a backup, the owner sets `STOCK_PROVIDERS` to `tradingview,mubasher`. When several sources are set and the first fails, returns nothing or returns old data, the next one serves and the answer names the source actually used.
+
+Known gaps (from the research notes, R3). These return `not_available` with a reason until a source is found (investor statistics and EGX30 in USD already do; the others once their tools are built):
+
+- Investor statistics by investor type (only the EGX website has them).
+- EGX30 in USD.
+- Disclosures in `what_changed_since`.
+- Company listing date and index membership (`indexCodes` stays empty).
+- Fund NAV history before the server started collecting, and fund comparisons against EGX30 before index history exists.
+- Bonus and split ratios: the sources give the event and dates but not the ratio, so the owner must enter each ratio. Until then, price history is labeled `adjustmentPending` or `rawPending`.
+
+Permission: EGX and EGID have not yet given permission to share this data. The server serves data from the sources above to any signed-in user until that changes. Seeking permission, or moving to a licensed feed, is an open owner task.
+
+## Connect from Claude
+
+You need the server address. Use `<PUBLIC_ORIGIN>` below for it (the owner gets it after deploying, see [Install and deploy from a clean Windows machine](#install-and-deploy-from-a-clean-windows-machine)). The MCP address is `<PUBLIC_ORIGIN>/mcp`.
+
+Sign in with Google (no key needed). This is not available yet (coming later): connecting with sign-in does not work in this build, and a client may fail before it reaches any page because no client registration endpoint exists yet. Use an API key for now (Claude Code can send one, see below).
+
+1. In Claude, open the connectors settings and choose to add a custom connector.
+2. Enter a name (for example `EGX`) and the address `<PUBLIC_ORIGIN>/mcp`, then save.
+3. Choose to connect. A Google sign-in page opens. Sign in with your Google account.
+4. Read the consent page (it repeats that the data is delayed and informational) and approve.
+5. Start a chat, enable the connector, and ask "What is the price of CIB?".
+
+Alternatively, use an API key:
+
+1. Open `<PUBLIC_ORIGIN>/dashboard` in a browser and sign in with Google.
+2. Create a key with a name. The full key (it starts with `egx_`) is shown once. Copy it now; after you reload, only its prefix remains. You can have up to 3 active keys, and you can revoke a key on the same page.
+3. In a client that lets you set request headers, send `Authorization: Bearer <your key>` to `<PUBLIC_ORIGIN>/mcp`. Claude.ai and Claude Desktop custom connectors take no headers, so they cannot use a key. Claude Code can:
+
+   ```text
+   claude mcp add --transport http egx <PUBLIC_ORIGIN>/mcp --header "Authorization: Bearer <your key>"
+   ```
+
+## Connect from ChatGPT
+
+Sign-in with OAuth is not available yet (coming later). Use an API key for now (see the last paragraph of this section).
+
+1. In ChatGPT, open the settings for connectors and enable developer mode if your plan requires it.
+2. Add a new connector and enter `<PUBLIC_ORIGIN>/mcp` as the server address. Choose OAuth as the sign-in method if asked.
+3. Choose to connect. Sign in with your Google account, read the consent page and approve.
+4. In a chat, enable the connector and ask "What is the price of CIB?".
+
+If your ChatGPT plan cannot use OAuth connectors, create an API key at `<PUBLIC_ORIGIN>/dashboard` (sign in with Google, create a key, copy it once) and use it as a bearer token where the connector form allows custom headers.
+
+## Connect from Cursor
+
+1. Open `<PUBLIC_ORIGIN>/dashboard` in a browser and sign in with Google.
+2. Create a key with a name and copy it. It is shown once.
+3. Open Cursor's `mcp.json` (project `.cursor/mcp.json` or your user-level file) and add:
+
+```json
+{
+  "mcpServers": {
+    "egx": {
+      "url": "<PUBLIC_ORIGIN>/mcp",
+      "headers": {
+        "Authorization": "Bearer <your key>"
+      }
+    }
+  }
+}
+```
+
+4. Restart Cursor or reload the MCP servers list. The `egx` server should show its tools.
+5. In the chat, ask "What is the price of CIB?".
+
+If a client reports `unauthorized` after you revoke a key, wait up to 2 minutes and use a new key.
+
+## Tools
+
+This build enables only `search`, `get_quotes`, `get_market_overview`, `get_indices` and `get_daily_summary`. The other tools below are planned and are not registered yet (coming later).
+
+Symbols can be given as a ticker, an ISIN, or an Arabic or English name. Index names accept the short aliases `EGX70` (meaning `EGX70EWI`) and `EGX100` (meaning `EGX100EWI`).
+
+| Tool | Example question |
+|---|---|
+| `search` | "Which stocks have cement in the name?" |
+| `get_quotes` | "What is the price of CIB and Talaat Moustafa?" |
+| `get_market_overview` | "How is the market doing right now?" |
+| `get_indices` | "What are EGX30 and EGX70 at?" |
+| `get_price_history` | "Show me COMI daily prices for the last year, raw and adjusted?" |
+| `compare_symbols` | "Which did better over 6 months, COMI, ETEL or SWDY?" |
+| `get_movers` | "Which stocks are the top gainers today?" |
+| `get_52_week_range` | "How far is COMI from its 52-week high?" |
+| `get_sector_performance` | "Which sectors did best this month?" |
+| `get_daily_summary` | "Give me a summary of the last session?" |
+| `get_fund` | "What is the latest NAV of this fund and how did it do this year?" |
+| `get_fund_history` | "Show the NAV history of this fund for the last 3 months?" |
+| `compare_funds` | "Compare these two funds over the last year against EGX30?" |
+| `get_real_return` | "What was the real return of this fund after inflation since January?" |
+| `get_company_profile` | "Tell me about COMI: sector, shares and first trade date?" |
+| `get_dividends` | "Which dividends have ex dates in the next 90 days?" |
+| `get_corporate_actions` | "What corporate actions did COMI have in the last 5 years?" |
+| `get_financials` | "What are COMI's revenue, net income and P/E?" |
+| `get_metals` | "What is the gold 21K price in Egypt today?" |
+| `get_usd_egp` | "What is the dollar rate in EGP now?" |
+| `portfolio_get` | "What is my portfolio worth and how is it allocated by sector?" |
+| `portfolio_upsert_holding` | "Can you record that I bought 100 COMI at 95 EGP on 2026-03-01?" |
+| `portfolio_remove_holding` | "Can you remove my COMI holding from my portfolio?" |
+| `price_level_set` | "Can you set a price level for when COMI goes above 100 EGP?" |
+| `price_level_remove` | "Can you remove my price level for COMI?" |
+| `price_levels_list` | "Which price levels have I set?" |
+| `what_changed_since` | "What changed since yesterday afternoon, including any price levels crossed?" |
+| `admin` | "As the owner, list the open notices?" |
+
+The server never pushes alerts. Crossings show in `what_changed_since`, `portfolio_get` and `price_levels_list` when you ask.
+
+Portfolio and price level data belongs to the signed-in user only. The `admin` tool works only for the Google emails listed in `OWNER_EMAILS`; everyone else gets `forbidden`.
+
+## Limits and fair use
+
+The service runs only on free hosting with no payment method, so reaching a limit causes a refusal, never a bill.
+
+- Per user (shared by all of that user's API keys and sign-ins): 100 calls per day (`USER_DAILY_CALLS`) and 10 calls per minute.
+- Global daily cap for all users together: 15,000 calls per day (`GLOBAL_DAILY_CALLS`), plus a cap on database rows read (a cap on sign-in storage writes is coming later). When a cap is reached, calls are refused until 00:00 UTC, even for users on the unlimited list.
+- Users whose Google email is in `UNLIMITED_EMAILS` skip the per-user limits, but not the global caps.
+- Sign-ups are also protected (coming later): when the daily sign-in storage budget is used up, new sign-ins get a `503` with a `Retry-After` header until 00:00 UTC.
+
+Retry messages tell you when to try again:
+
+- Per-minute limit: "Rate limit reached. Retry at <time>." where the time is one minute ahead.
+- Per-day limit: "Rate limit reached. Retry at <time>." where the time is the next 00:00 UTC.
+- Global cap: "The free service is at capacity until 00:00 UTC."
+
+The limits are settings in `wrangler.jsonc` (or the Cloudflare dashboard). Changing them needs no code change.
+
+## Install and deploy from a clean Windows machine
+
+Prerequisites:
+
+- Windows 11.
+- Node.js 24 LTS.
+- Git.
+- A free Cloudflare account with no payment method attached.
+- A Google Cloud OAuth client of type web application. Its authorized redirect URIs are `https://<worker host>/callback/google` and `https://<worker host>/dashboard/callback` for the deployed Worker, and `http://localhost:8787/callback/google` and `http://localhost:8787/dashboard/callback` for local runs. Keep the client id and client secret.
+- An MCP client (Claude, ChatGPT, Cursor, or MCP Inspector with `npx @modelcontextprotocol/inspector`).
+
+Steps (run them in a terminal in the cloned folder):
+
+1. Clone the repository: `git clone <repository URL>` and `cd` into it. The repository URL comes from wherever the owner hosts the code.
+2. Install packages: `npm ci`
+3. Generate the Worker types: `npm run types`
+4. Log in to Cloudflare: `npx wrangler login`
+5. Create the database and both key-value stores:
+
+   ```text
+   npx wrangler d1 create egx
+   npx wrangler kv namespace create DATA
+   npx wrangler kv namespace create OAUTH_KV
+   ```
+
+   Each command prints an id. Paste them into `wrangler.jsonc`: the database id as `database_id` in the `DB` entry of `d1_databases`, and each namespace id as `id` in the matching `kv_namespaces` entry (`DATA`, `OAUTH_KV`).
+6. Store the three secrets (each command asks for the value):
+
+   ```text
+   npx wrangler secret put GOOGLE_CLIENT_ID
+   npx wrangler secret put GOOGLE_CLIENT_SECRET
+   npx wrangler secret put SESSION_SECRET
+   ```
+
+   `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` come from your Google OAuth client. `SESSION_SECRET` is a long random string you make up.
+7. Set your own values in the `vars` of `wrangler.jsonc`: `OWNER_EMAILS` (your Google email, comma separated for several), `UNLIMITED_EMAILS` (optional), and `PUBLIC_ORIGIN` (the Worker address, for example `https://<worker name>.<your workers subdomain>.workers.dev`; you learn the exact address after the first deploy, so set it and deploy again).
+8. Create the tables, locally and then remotely:
+
+   ```text
+   npx wrangler d1 migrations apply egx --local
+   npx wrangler d1 migrations apply egx --remote
+   ```
+
+9. Check the project: `npm run typecheck` and `npm test`.
+10. Run it locally: `npm run dev`. To trigger a job by hand while it runs, open `http://localhost:8787/__scheduled?cron=<cron with spaces as +>`. The snapshot job is `cron=*+6-12+*+*+SUN-THU`. It writes data only during the Cairo session window (09:55 to 14:45, Sunday to Thursday), and it needs the symbol list, which only the end-of-day job writes. So run the end-of-day job first, with `cron=30+12,13+*+*+SUN-THU`, on a trading day at 15:30 Cairo time or later. For local sign-in, put the secrets and `PUBLIC_ORIGIN=http://localhost:8787` in a `.dev.vars` file (it is not committed). Without `PUBLIC_ORIGIN` the dashboard is unavailable.
+11. Load the historical data (coming later: the backfill script is not built yet). This needs at least one end-of-day run first so that the symbols exist. Load corporate actions first, then the prices, and re-run the second command on later days until it finishes (a daily row budget limits how much is loaded per day):
+
+    ```text
+    npm run backfill -- --actions --years 5
+    npm run backfill -- --years 5
+    npm run backfill -- --validate
+    ```
+
+    The `--validate` run compares the newest stored close of each symbol with the source file and lists symbols that differ by more than 0.5 percent.
+12. Deploy: `npm run deploy`. Wrangler prints the Worker address. Put it in `PUBLIC_ORIGIN`, add its two redirect URIs to the Google OAuth client, and run `npm run deploy` again.
+13. Make the first tool call: open `<PUBLIC_ORIGIN>/dashboard`, sign in, create a key, connect a client as described above and ask "What is the price of CIB?". On a fresh deploy there are no quotes yet: the first end-of-day run (15:30 Cairo time or later on a trading day) builds the symbol list, and quotes appear from the snapshot job of the next session.
+
+Holiday table maintenance (coming later: the `admin` tool is not built yet): the server skips dates marked as holidays and uses special hours (for example Ramadan) from a table you maintain. Ask the `admin` tool, for example:
+
+- `set_calendar_day` with `date`, `kind` `holiday` and a `note`.
+- `set_calendar_day` with `kind` `special_hours`, `openTime` and `closeTime`.
+- `list_calendar` with `from` and `to`, and `remove_calendar_day` with `date`.
+
+A holiday missing from the table is detected automatically when no trades happen, and the day is reported as closed.
+
+Update and rollback:
+
+1. To update: pull the new code, run `npm ci`, `npx wrangler d1 migrations apply egx --remote` if there are new migrations, then `npm run deploy`.
+2. To see recent versions: `npx wrangler deployments list`
+3. To go back to the previous version: `npx wrangler rollback`
+
+## Owner tasks
+
+(Coming later: the `admin` tool is not built yet, so none of the tasks below can be done in this build.)
+
+The owner is anyone whose Google email is in `OWNER_EMAILS`. All of these use the `admin` tool from an MCP client.
+
+Notices: the server raises a notice when something needs attention (a new listing, a failed job, a ratio needed, a stale fund, a source switch). Read them with `list_notices` (status `open` by default) and close them with `mark_notice_done` and their `ids`. Check them regularly.
+
+Corporate action ratios: for bonus, split and reverse split events the sources give no ratio, so the action waits with status `needs_ratio` and a notice. Set it with `set_action_ratio` (`actionId`, `ratio`). The ratio is the number of shares held after per share held before, except for bonus, where it is the bonus shares received per share held. The allowed range depends on the kind:
+
+| Kind | Valid ratio | Example |
+|---|---|---|
+| Bonus | above 0 up to 10 | "1 bonus share for every 4 held" is `0.25` |
+| Split | above 1 | a 2 for 1 split is `2` |
+| Reverse split | between 0 and 1 | a 1 for 10 reverse split is `0.1` |
+
+Any other value is refused as `invalid_input`. The definition and the full action list are in [contracts/admin-tool.md](specs/001-egx-mcp-server/contracts/admin-tool.md).
+
+Correcting a wrong ratio: if you applied a wrong ratio, run `revert_action` for that `actionId` (it restores the prices and sets the action back to `needs_ratio`), then run `set_action_ratio` again with the right value. Do not edit the database by hand.
+
+Refused applies: `set_action_ratio` and `add_corporate_action` return `status`, `rowsAdjusted` and `refusedReason`. When the apply is refused, the action stays `recorded` and the end-of-day job retries it. The reasons are:
+
+- `ex_date_not_reached`: the ex date is after the latest stored session. It applies by itself after the end-of-day run on the ex date.
+- `backfill_loading`: the symbol's history is still being loaded by the backfill. Finish the backfill for that symbol first.
+- `daily_cap`: today's limit on adjusted rows is used up. Try again after 00:00 UTC.
+
+Draining the queue: run `apply_queued_actions` (optional `limit` 1 to 3) to apply the oldest waiting actions now. It returns the applied actions and how many remain.
+
+Inflation: real return needs monthly inflation. Enter each month with `set_inflation` (`month` as `YYYY-MM`, `cpiIndex`, `yoyPct`, `source`), using the CAPMAS monthly urban CPI. Without the months in a range, `get_real_return` answers `not_available`.
+
+Other admin actions: `list_discrepancies` (stock prices that differ between sources), `usage_summary` (today's global usage and the top users), and `activate_symbol` (turn a newly found `pending` symbol into `active`).
+
+## Troubleshooting
+
+| Symptom | Cause | Recovery |
+|---|---|---|
+| Answers say the data is stale, or a quote has `stale: true` | The symbol's last trade is older than the last completed session (for example it is suspended), or a refresh job failed and the last stored data is being served. | Check the `dataTime` and `source` in the answer. Notices can be read only once the `admin` tool exists (coming later). Meanwhile `npx wrangler tail` shows thrown errors only, not job results, so the `dataTime` and `source` in the answer are the main signal. The data refreshes at the next job run. |
+| Source outage: answers come from a different source, or a tool returns `not_available` | A source is down or changed its format. The server keeps the last stored data and raises one `job_failed` notice per job, source and day, and a `source_switched` notice when a backup served (notices can be read only once the `admin` tool exists, coming later). With the default `STOCK_PROVIDERS` there is no backup in this build, so answers keep the last stored data. | Nothing is lost. If a source stays broken for days, check whether its page or API changed and set `STOCK_PROVIDERS` to `tradingview,mubasher` for a backup. |
+| Blocked requests: a source works from your desktop but not from the Worker, or the opposite | The source blocks the Cloudflare network or your location (the EGX website did this during research). | Set `STOCK_PROVIDERS` to `tradingview,mubasher` and deploy. The Worker also keeps serving stored data meanwhile. |
+| `capacity` error: "The free service is at capacity until 00:00 UTC." | The global daily cap is reached. This protects the free tier. | Wait until 00:00 UTC. The owner can raise `GLOBAL_DAILY_CALLS` in `wrangler.jsonc` only while it stays within the free limits. |
+| `rate_limited` error | You passed 10 calls per minute or 100 per day. | Retry at the time in the message. The owner can raise `USER_DAILY_CALLS` or list a user in `UNLIMITED_EMAILS`. |
+| Sign-in fails (error page, `503`, or returned to the client without access) | The Google OAuth client is missing a redirect URI, the secrets are wrong, `PUBLIC_ORIGIN` is not the Worker address, or the daily sign-in storage budget is used up (`503` with `Retry-After`, coming later). | Check the redirect URIs in the Google client against `<PUBLIC_ORIGIN>`, re-run `npx wrangler secret put` for the secrets, check `PUBLIC_ORIGIN`, and retry after the `Retry-After` time. |
+| `unauthorized` | The key was revoked or mistyped, or the account was deleted. | Create a new key at `<PUBLIC_ORIGIN>/dashboard`. A revoked key stops working within 2 minutes. |
+| `forbidden` on `admin` (coming later) | Your Google email is not in `OWNER_EMAILS`. | Add it in `wrangler.jsonc` and deploy again. |
+| Every request fails with a `500`, and the snapshot job throws `invalid config: <name>` during the session window | A value in `wrangler.jsonc` `vars` is invalid, or the combination of caps goes over the free limits (the name `rows written budget` means lowering `GLOBAL_DAILY_CALLS`, `ADJUST_MAX_ROWS_PER_DAY` or `PERSONAL_DAILY_ROWS`). The server checks this on each request, not at start. An invalid `PUBLIC_ORIGIN` (for example without `https://`) also gives a `500` on every request, with nothing logged. | Read the name in the error (`wrangler tail` shows it), correct that value in `wrangler.jsonc` and deploy again. For `PUBLIC_ORIGIN`, set the full address with `https://`. |

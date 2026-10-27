@@ -7,3 +7,6 @@ coverage/
 .env
 .env.*
 *.log
+scripts/backfill/progress.json
+scripts/backfill/out/
+worker-configuration.d.ts
