@@ -7,7 +7,7 @@ function envWith(overrides: Partial<Record<keyof Env, string>> = {}): Env {
 }
 
 describe("loadConfig", () => {
-  it("parses the defaults from wrangler.jsonc", () => {
+  it("parses the configured defaults", () => {
     const config = loadConfig(envWith());
 
     expect(config).toEqual({
@@ -15,8 +15,8 @@ describe("loadConfig", () => {
       globalDailyRowsRead: 3500000,
       oauthDailyKvWrites: 600,
       userDailyCalls: 100,
-      ownerEmails: new Set(),
-      unlimitedEmails: new Set(),
+      ownerEmails: new Set(["ahm.elessawy@gmail.com"]),
+      unlimitedEmails: new Set(["loay.elessawy@gmail.com", "abdelrahman.m.essawy@gmail.com"]),
       stockProviders: ["egx", "tradingview"],
       snapshotEveryMinutes: 1,
       backfillMaxRowsPerDay: 36000,
