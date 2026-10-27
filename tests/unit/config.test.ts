@@ -1,6 +1,6 @@
 import { env } from "cloudflare:test";
 import { describe, expect, it } from "vitest";
-import { loadConfig, parseOrigin } from "../../src/config";
+import { loadConfig, parseOrigin, resolvePublicOrigin } from "../../src/config";
 
 function envWith(overrides: Partial<Record<keyof Env, string>> = {}): Env {
   return { ...env, ...overrides } as unknown as Env;
@@ -114,5 +114,29 @@ describe("parseOrigin", () => {
 
   it.each([[""], ["not a url"], ["localhost:8787"], ["ftp://egx.example.com"]])("rejects %j", (value) => {
     expect(parseOrigin(value)).toBeNull();
+  });
+});
+
+describe("resolvePublicOrigin", () => {
+  it("uses the request origin when no origin is configured", () => {
+    const request = new Request("https://req.example.com/any");
+
+    expect(resolvePublicOrigin(request, envWith({ PUBLIC_ORIGIN: "" }))).toBe(
+      "https://req.example.com",
+    );
+  });
+
+  it("uses the configured origin", () => {
+    const request = new Request("https://req.example.com/any");
+
+    expect(
+      resolvePublicOrigin(request, envWith({ PUBLIC_ORIGIN: "https://egx.example.com/path" })),
+    ).toBe("https://egx.example.com");
+  });
+
+  it("returns null for a configured origin that is not http or https", () => {
+    const request = new Request("https://req.example.com/any");
+
+    expect(resolvePublicOrigin(request, envWith({ PUBLIC_ORIGIN: "ftp://egx.example.com" }))).toBeNull();
   });
 });

@@ -27,7 +27,7 @@ import {
   STATUS_SEE_OTHER,
   STATUS_SERVICE_UNAVAILABLE,
 } from "./status";
-import { KEY_NAME_MAX_LENGTH, dashboardView, htmlResponse, messageView, withCookies } from "./views";
+import { DASHBOARD_PATH, KEY_NAME_MAX_LENGTH, dashboardView, htmlResponse, messageView, withCookies } from "./views";
 
 const LOGIN_COOKIE_NAME = "__Host-egx_login";
 const LOGIN_COOKIE_SECONDS = 600;
@@ -36,7 +36,6 @@ const LOGIN_SEPARATOR = ".";
 const STATE_BYTES = 32;
 const CALLBACK_PATH = "/dashboard/callback";
 const LANDING_PATH = "/";
-const DASHBOARD_PATH = "/dashboard";
 const LOGIN_PATH = "/dashboard/login";
 const NEW_USER_WORST_CASE_ROWS = 4;
 const KEY_CREATE_WORST_CASE_ROWS = 5;

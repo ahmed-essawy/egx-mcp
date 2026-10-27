@@ -124,3 +124,8 @@ export function parseOrigin(value: string): string | null {
     return null;
   }
 }
+
+export function resolvePublicOrigin(request: Request, env: Env): string | null {
+  const configured = loadConfig(env).publicOrigin;
+  return configured === "" ? new URL(request.url).origin : parseOrigin(configured);
+}

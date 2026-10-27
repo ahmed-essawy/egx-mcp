@@ -1,3 +1,4 @@
+import { resolvePublicOrigin } from "../config";
 import {
   callbackHandler,
   createKeyHandler,
@@ -8,7 +9,7 @@ import {
 } from "./dashboard";
 import { privacyView, termsView } from "./legal";
 import { STATUS_INTERNAL_ERROR, STATUS_NOT_FOUND, STATUS_NOT_IMPLEMENTED, STATUS_OK } from "./status";
-import { HTML_HEADERS, htmlResponse, landingView, messageView, STYLESHEET } from "./views";
+import { HTML_HEADERS, htmlResponse, landingView, mcpUrl, messageView, STYLESHEET } from "./views";
 
 const CSS_CACHE_CONTROL = "public, max-age=300";
 const CSS_CONTENT_TYPE = "text/css; charset=utf-8";
@@ -20,6 +21,12 @@ type Route = { method: string; pattern: RegExp; handler: RouteHandler };
 
 function stylesheetResponse(): Response {
   return new Response(STYLESHEET, { headers: { ...HTML_HEADERS, "content-type": CSS_CONTENT_TYPE, "cache-control": CSS_CACHE_CONTROL } });
+}
+
+function landingResponse(request: Request, env: Env): Response {
+  const origin = resolvePublicOrigin(request, env);
+  if (origin === null) return internalErrorResponse();
+  return htmlResponse(landingView(mcpUrl(origin)), STATUS_OK);
 }
 
 function signInUnavailableResponse(): Response {
@@ -35,7 +42,7 @@ export function internalErrorResponse(): Response {
 }
 
 const ROUTES: Route[] = [
-  { method: "GET", pattern: /^\/$/, handler: () => htmlResponse(landingView(), STATUS_OK) },
+  { method: "GET", pattern: /^\/$/, handler: landingResponse },
   { method: "GET", pattern: /^\/styles\.css$/, handler: stylesheetResponse },
   { method: "GET", pattern: /^\/privacy$/, handler: () => htmlResponse(privacyView(), STATUS_OK) },
   { method: "GET", pattern: /^\/terms$/, handler: () => htmlResponse(termsView(), STATUS_OK) },

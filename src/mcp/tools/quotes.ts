@@ -19,7 +19,7 @@ import { loadMarketClock, sessionMeta, type MarketClock } from "../session";
 import { DIRECTORY_MISSING_MESSAGE, identityOf, identitySchema, newestDataTime } from "../shared";
 
 const MIN_SYMBOLS = 1;
-const MAX_SYMBOLS = 20;
+export const MAX_SYMBOLS = 20;
 const SNAPSHOT_FIELD = "snapshot";
 const SNAPSHOT_MISSING_REASON = "snapshot not built yet";
 

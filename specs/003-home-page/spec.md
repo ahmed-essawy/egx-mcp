@@ -1,0 +1,61 @@
+# Feature Specification: Home page redesign
+
+**Feature Branch**: `003-home-page` (delivered on `pipeline/claude-home-page`, squash-local) | **Created**: 2026-10-28 | **Status**: Planned
+
+**Input**: Redesign the public home page `GET /` (today `landingView` in `src/http/views.ts`) with these sections in order: hero (product name, one-line value, "Sign in" and "Read the docs" buttons), what you can ask (example prompts for quotes, market overview and indices), connect in 3 steps (sign in, create a key, add the MCP address with an `Authorization: Bearer` header, using the configured public origin), what is covered (only the 5 MVP tools), data sources, a clear notice (delayed, unofficial, not financial advice), and the shared footer (Home, Privacy, Terms). No GitHub link. One shared stylesheet, accessible, light and dark through `prefers-color-scheme`, no external fonts or scripts, CSP unchanged. Out of scope: logo and favicon, the legal pages, the dashboard.
+
+## User Scenarios and Testing
+
+### User Story 1: Understand the product and sign in (Priority: P1)
+
+A visitor opens the home page, understands in one line what EGX MCP does, and can sign in or jump to the setup guide.
+
+**Independent Test**: `GET /` returns `200` HTML whose first section has the `<h1>` "EGX MCP", the one-line value, a "Sign in" link to `/dashboard`, a "Read the docs" link to `#connect`, and the agreement sentence with both policy links.
+
+### User Story 2: Connect an AI client (Priority: P1)
+
+A visitor follows 3 numbered steps (sign in, create a key, add the MCP address with the bearer header) and connects a client that can send a request header.
+
+**Independent Test**: the `#connect` section is an ordered list of 3 steps; step 3 shows the MCP address built from the configured public origin (or the request origin when none is configured) and `Authorization: Bearer <your key>`.
+
+### User Story 3: Know what is covered and how reliable it is (Priority: P2)
+
+A visitor sees example questions, the 5 tools that exist today, the data sources and a notice that the data is delayed, unofficial and not financial advice.
+
+**Independent Test**: the page names exactly the 5 registered tools, every data source, and the notice sentences of FR-H06.
+
+### Edge Cases
+
+- `PUBLIC_ORIGIN` empty (local runs): the MCP address uses the request origin, the same rule the OAuth wrapper in `src/index.ts` uses.
+- `PUBLIC_ORIGIN` set but not a valid http or https origin: `GET /` answers `500` with the existing "Something went wrong" page (in production the OAuth wrapper already answers `500` before the route is reached).
+- `POST /`: `404` (unchanged).
+- Narrow screens (375 px): no horizontal scrolling; the long MCP address wraps.
+- Dark system theme: every text, link, button and border keeps WCAG 2.2 AA contrast.
+
+## Requirements
+
+- **FR-H01**: `GET /` MUST return `200` with `HTML_HEADERS` unchanged (CSP `default-src 'self'; frame-ancestors 'none'`, `nosniff`, `same-origin`, `no-store`) and no `set-cookie`. It MUST NOT read D1 or KV; it reads only the configuration.
+- **FR-H02 Hero**: `<h1>` "EGX MCP"; one-line value "Ask your AI assistant about Egyptian Exchange stocks and indices, with delayed data through the Model Context Protocol."; a "Sign in" link to `/dashboard` and a "Read the docs" link to `#connect`, both styled as buttons; then the agreement sentence "By signing in you agree to the Terms of use and acknowledge the Privacy policy." (spec 002 FR-L02a) with both linked.
+- **FR-H03 What you can ask**: `<h2>` "What you can ask" and these 5 example prompts: "Find the ticker for Talaat Moustafa.", "What is the price of CIB and Talaat Moustafa?", "How is the EGX market doing today?", "What are EGX30 and EGX70 at?", "Give me a summary of the last session."
+- **FR-H04 Connect in 3 steps**: `<h2>` "Connect in 3 steps" in a section with `id="connect"`; an ordered list: (1) sign in with Google (link `/dashboard`); (2) create an API key in the dashboard and copy it, it is shown only once; (3) add the server to an MCP client that lets you set a request header, with the server URL `<origin>/mcp` and the header `Authorization: Bearer <your key>`. A note after the list states that Claude.ai and Claude Desktop custom connectors cannot send a header and that sign-in from AI assistants is coming later (same facts as the README).
+- **FR-H05 What is covered**: `<h2>` "What is covered" listing exactly `search`, `get_quotes`, `get_market_overview`, `get_indices`, `get_daily_summary` with a one-line summary each, adapted from the registered tool descriptions (exact text in plan.md). The list MUST equal the tools the MCP server registers (guarded by a test).
+- **FR-H06 Data sources and notice**: `<h2>` "Data sources" listing every entry of `DATA_SOURCES`, with the sentence that the Egyptian Exchange has not given permission to redistribute the data; `<h2>` "Important notice" with: "Data is delayed, unofficial and informational only.", "It is not real-time and can be late, wrong or missing. Check an official source before acting.", "Nothing here is financial advice or a buy, sell or hold recommendation.", "EGX MCP is not affiliated with, endorsed by or sponsored by the Egyptian Exchange."
+- **FR-H07 Footer**: the shared footer from `page()` (Home, Privacy policy, Terms of use). No GitHub or README link anywhere on the page.
+- **FR-H08 Accessibility**: one `<h1>`; every content section is a `<section aria-labelledby>` pointing at its `<h2 id>`; the skip link stays; focus outline visible on links and buttons; text and controls meet WCAG 2.2 AA contrast in light and dark; link targets at least 24 by 24 CSS px.
+- **FR-H09 Styling**: one stylesheet (`STYLESHEET`, served at `/styles.css`) with colors as custom properties, a `prefers-color-scheme: dark` override and `color-scheme: light dark`; no inline styles, no `<style>`, no `<script>`, no external fonts or files. Layout works at 375, 1024 and 1440 px wide without horizontal scrolling.
+- **FR-H10 Contract**: `specs/001-egx-mcp-server/contracts/http-endpoints.md` row `GET /` describes this page.
+
+## Success Criteria
+
+- **SC-H01**: `GET /` answers `200` in the Node-pool unit run with the configured and with the fallback origin.
+- **SC-H02**: The home page names 5 tools and the MCP server registers the same 5 (one test fails if they drift).
+- **SC-H03**: No statement on the home page contradicts the legal pages, the README or the code.
+- **SC-H04**: `npm run typecheck` and the Node-pool unit run pass with no failure beyond the 8 known `usage-store` failures.
+- **SC-H05**: At 375, 1024 and 1440 px the page has no horizontal scrolling (rendered check, or recorded NOT RENDERED).
+
+## Assumptions
+
+- "Read the docs" points at the in-page `#connect` guide: the public README URL is unknown, and the old `README_URL` constant (a guessed GitHub address) is removed.
+- "Sign in" points at `/dashboard`, which redirects a signed-out visitor to Google sign-in and shows the dashboard to a signed-in one.
+- Client wording: the owner named Claude, ChatGPT and Cursor; the page says "an MCP client that lets you set a request header" and names Claude Code and Cursor, because Claude.ai and Claude Desktop connectors take no headers and ChatGPT only where its form allows custom headers (README "Connect from" sections).
+- Logo, favicon and dashboard styling are later runs. Dashboard and legal pages change only through the shared stylesheet (colors become custom properties with the same light values).

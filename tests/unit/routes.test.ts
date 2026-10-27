@@ -1,3 +1,4 @@
+import { env } from "cloudflare:test";
 import { describe, expect, it } from "vitest";
 import { privacyView, termsView } from "../../src/http/legal";
 import { defaultHandler } from "../../src/http/routes";
@@ -6,17 +7,34 @@ const ORIGIN = "https://egx.example.com";
 const NOT_IMPLEMENTED = 501;
 const NOT_FOUND = 404;
 
-async function call(path: string, method = "GET"): Promise<Response> {
+function envWith(origin: string): Env {
+  return { ...env, PUBLIC_ORIGIN: origin } as unknown as Env;
+}
+
+async function call(path: string, method = "GET", bindings: Env = {} as Env): Promise<Response> {
   const request = new Request(`${ORIGIN}${path}`, { method });
-  return defaultHandler.fetch!(request as never, {} as Env, {} as ExecutionContext);
+  return defaultHandler.fetch!(request as never, bindings, {} as ExecutionContext);
 }
 
 describe("defaultHandler", () => {
-  it("serves the landing page as HTML", async () => {
-    const response = await call("/");
+  it("serves the landing page as HTML with the configured MCP URL", async () => {
+    const response = await call("/", "GET", envWith("https://egx.configured.test"));
     expect(response.status).toBe(200);
     expect(response.headers.get("content-type")).toContain("text/html");
     expect(response.headers.get("content-security-policy")).toBe("default-src 'self'; frame-ancestors 'none'");
+    expect(response.headers.get("cache-control")).toBe("no-store");
+    expect(response.headers.get("set-cookie")).toBeNull();
+    expect(await response.text()).toContain("<code>https://egx.configured.test/mcp</code>");
+  });
+
+  it("falls back to the request origin for the MCP URL", async () => {
+    const response = await call("/", "GET", envWith(""));
+    expect(await response.text()).toContain("<code>https://egx.example.com/mcp</code>");
+  });
+
+  it("answers 500 for the landing page when the configured origin is invalid", async () => {
+    const response = await call("/", "GET", envWith("ftp://egx.example.com"));
+    expect(response.status).toBe(500);
   });
 
   it("serves the stylesheet as CSS with the security headers", async () => {

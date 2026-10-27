@@ -1,12 +1,12 @@
 import { OAuthProvider } from "@cloudflare/workers-oauth-provider";
 import { createMcpHandler } from "agents/mcp/server";
 import { API_KEY_SCOPES, resolveApiKey, type AuthProps } from "./auth/api-keys";
-import { loadConfig, parseOrigin } from "./config";
+import { resolvePublicOrigin } from "./config";
 import { defaultHandler, internalErrorResponse } from "./http/routes";
+import { MCP_PATH, mcpUrl } from "./http/views";
 import { scheduled } from "./jobs/dispatch";
 import { createServer } from "./mcp/server";
 
-const MCP_ROUTE = "/mcp";
 const AUTHORIZE_ROUTE = "/authorize";
 const TOKEN_ROUTE = "/token";
 const ACCESS_TOKEN_TTL_SECONDS = 86_400;
@@ -19,9 +19,9 @@ const mcpHandler: Required<Pick<ExportedHandler<Env>, "fetch">> = {
 };
 
 function createProvider(origin: string): OAuthProvider<Env> {
-  const resource = new URL(MCP_ROUTE, origin).href;
+  const resource = mcpUrl(origin);
   return new OAuthProvider<Env>({
-    apiRoute: MCP_ROUTE,
+    apiRoute: MCP_PATH,
     apiHandler: mcpHandler,
     defaultHandler,
     authorizeEndpoint: AUTHORIZE_ROUTE,
@@ -38,14 +38,9 @@ function createProvider(origin: string): OAuthProvider<Env> {
 
 let cachedProvider: { origin: string; provider: OAuthProvider<Env> } | undefined;
 
-function resolveOrigin(request: Request, env: Env): string | null {
-  const configured = loadConfig(env).publicOrigin;
-  return configured === "" ? new URL(request.url).origin : parseOrigin(configured);
-}
-
 function providerFor(request: Request, env: Env): OAuthProvider<Env> | null {
   try {
-    const origin = resolveOrigin(request, env);
+    const origin = resolvePublicOrigin(request, env);
     if (origin === null) return null;
     if (cachedProvider?.origin !== origin) cachedProvider = { origin, provider: createProvider(origin) };
     return cachedProvider.provider;

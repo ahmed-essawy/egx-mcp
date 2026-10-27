@@ -1,5 +1,7 @@
 import { CSRF_FIELD } from "../auth/session";
 import { utcDay } from "../domain/calendar";
+import { MAX_SYMBOLS } from "../mcp/tools/quotes";
+import type { ToolName } from "../mcp/tool-names";
 import type { ApiKeySummary } from "../store/d1/users";
 
 export const KEY_NAME_MAX_LENGTH = 40;
@@ -9,7 +11,13 @@ export const HOME_PATH = "/";
 export const PRIVACY_PATH = "/privacy";
 export const TERMS_PATH = "/terms";
 const STYLESHEET_PATH = "/styles.css";
-const README_URL = "https://github.com/ahmed-essawy/egx-mcp#readme";
+export const MCP_PATH = "/mcp";
+export const DASHBOARD_PATH = "/dashboard";
+const CONNECT_ID = "connect";
+const BEARER_HEADER = "Authorization: Bearer <your key>";
+const PRODUCT_NAME = "EGX MCP";
+const VALUE_LINE =
+  "Ask your AI assistant about Egyptian Exchange stocks and indices, with delayed data through the Model Context Protocol.";
 export const DATA_SOURCES = [
   "EGX website",
   "TradingView",
@@ -20,6 +28,32 @@ export const DATA_SOURCES = [
 export const TERMS_LINK = `<a href="${TERMS_PATH}">Terms of use</a>`;
 export const PRIVACY_LINK = `<a href="${PRIVACY_PATH}">Privacy policy</a>`;
 const DISCLAIMER = "Data is delayed, unofficial and informational only.";
+export const EXAMPLE_PROMPTS = [
+  "Find the ticker for Talaat Moustafa.",
+  "What is the price of CIB and Talaat Moustafa?",
+  "How is the EGX market doing today?",
+  "What are EGX30 and EGX70 at?",
+  "Give me a summary of the last session.",
+];
+export const COVERED_TOOLS: { name: ToolName; summary: string }[] = [
+  { name: "search", summary: "Find Egyptian stocks by ticker, ISIN, or Arabic or English name. Mutual funds are coming later." },
+  { name: "get_quotes", summary: `Delayed quotes for up to ${MAX_SYMBOLS} Egyptian stocks by ticker, ISIN, or Arabic or English name.` },
+  {
+    name: "get_market_overview",
+    summary: "The delayed EGX market overview: indices, breadth, top movers, most active stocks and totals.",
+  },
+  { name: "get_indices", summary: "Delayed EGX index values by name or code." },
+  {
+    name: "get_daily_summary",
+    summary: "A summary of the last completed session: indices, breadth, top movers and totals.",
+  },
+];
+export const NOTICE_SENTENCES = [
+  DISCLAIMER,
+  "It is not real-time and can be late, wrong or missing. Check an official source before acting.",
+  "Nothing here is financial advice or a buy, sell or hold recommendation.",
+  `${PRODUCT_NAME} is not affiliated with, endorsed by or sponsored by the Egyptian Exchange.`,
+];
 
 const HTML_ESCAPES: Record<string, string> = {
   "&": "&amp;",
@@ -30,17 +64,31 @@ const HTML_ESCAPES: Record<string, string> = {
 };
 
 export const STYLESHEET = `
-body { font-family: system-ui, sans-serif; line-height: 1.5; margin: 0; color: #1a1a1a; background: #ffffff; }
+:root { color-scheme: light dark; --text: #1a1a1a; --background: #ffffff; --surface: #f2f4f7; --border: #767676; --link: #0b4f9c; --on-link: #ffffff; --error: #9b1c1c; }
+@media (prefers-color-scheme: dark) { :root { --text: #e8e8e8; --background: #121212; --surface: #1e2329; --border: #8a8a8a; --link: #8ab4f8; --on-link: #121212; --error: #ff8a80; } }
+body { font-family: system-ui, sans-serif; line-height: 1.5; margin: 0; color: var(--text); background: var(--background); }
 main, footer { max-width: 48rem; margin: 0 auto; padding: 1rem; }
-footer { border-top: 1px solid #767676; }
-a { color: #0b4f9c; }
+footer { border-top: 1px solid var(--border); }
+footer nav { display: flex; flex-wrap: wrap; gap: 1rem; }
+a { color: var(--link); }
 .skip-link { position: absolute; left: -999px; }
-.skip-link:focus { left: 1rem; top: 1rem; background: #ffffff; padding: 0.5rem; }
-a:focus-visible, button:focus-visible, input:focus-visible { outline: 3px solid #0b4f9c; outline-offset: 2px; }
+.skip-link:focus { left: 1rem; top: 1rem; background: var(--background); padding: 0.5rem; }
+a:focus-visible, button:focus-visible, input:focus-visible { outline: 3px solid var(--link); outline-offset: 2px; }
 table { border-collapse: collapse; width: 100%; }
-th, td { text-align: left; padding: 0.5rem; border-bottom: 1px solid #767676; }
-.error { color: #9b1c1c; }
+th, td { text-align: left; padding: 0.5rem; border-bottom: 1px solid var(--border); }
+.error { color: var(--error); }
 #new-key { width: 100%; font-family: monospace; }
+code { font-family: monospace; overflow-wrap: anywhere; }
+.hero, section[id] { margin-block: 2rem; }
+.hero h1 { font-size: 2.5rem; line-height: 1.2; margin-block: 1rem; }
+.lead { font-size: 1.25rem; }
+.actions { display: flex; flex-wrap: wrap; gap: 0.75rem; }
+.button { display: inline-block; padding: 0.75rem 1.25rem; border: 2px solid var(--link); border-radius: 0.5rem; font-weight: 600; text-decoration: none; }
+.button-primary { background: var(--link); color: var(--on-link); }
+.steps li, .examples li { margin-block: 0.5rem; }
+.tools { display: grid; grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr)); gap: 1rem; padding: 0; list-style: none; }
+.tools li { padding: 1rem; border: 1px solid var(--border); border-radius: 0.5rem; }
+#notice { padding: 1rem; border-left: 4px solid var(--link); background: var(--surface); }
 `;
 
 export const HTML_HEADERS: Record<string, string> = {
@@ -98,20 +146,20 @@ export function messageView(title: string, text: string): string {
   return page(title, `<h1>${escapeHtml(title)}</h1>\n<p>${escapeHtml(text)}</p>\n<p><a href="/">Back to the start</a></p>`);
 }
 
-export function landingView(): string {
-  return page(
-    "EGX MCP",
-    `<h1>EGX MCP</h1>
-<p>Egyptian Exchange market data for your AI assistant, through the Model Context Protocol.</p>
-<p>${escapeHtml(DISCLAIMER)}</p>
-<h2>Data sources</h2>
-<ul>
-${DATA_SOURCES.map((source) => `<li>${escapeHtml(source)}</li>`).join("\n")}
-</ul>
-<p><a href="${README_URL}">Read the README</a></p>
-<p><a href="/dashboard">Sign in to manage your API keys</a></p>
-${agreementNotice("signing in")}`,
-  );
+export function mcpUrl(origin: string): string {
+  return new URL(MCP_PATH, origin).href;
+}
+
+export function landingView(serverUrl: string): string {
+  const sections = [
+    heroSection(),
+    examplesSection(),
+    connectSection(serverUrl),
+    toolsSection(),
+    sourcesSection(),
+    noticeSection(),
+  ];
+  return page(PRODUCT_NAME, sections.join("\n"));
 }
 
 export function consentView(input: ConsentInput): string {
@@ -141,6 +189,61 @@ export function dashboardView(input: DashboardInput): string {
     logoutForm(input.csrf),
   ];
   return page("Dashboard", body.filter((section) => section !== "").join("\n"));
+}
+
+function listItems(items: string[]): string {
+  return items.map((item) => `<li>${escapeHtml(item)}</li>`).join("\n");
+}
+
+function contentSection(id: string, title: string, bodyHtml: string): string {
+  return `<section id="${id}" aria-labelledby="${id}-title">
+<h2 id="${id}-title">${title}</h2>
+${bodyHtml}
+</section>`;
+}
+
+function heroSection(): string {
+  return `<section class="hero" aria-labelledby="hero-title">
+<h1 id="hero-title">${escapeHtml(PRODUCT_NAME)}</h1>
+<p class="lead">${escapeHtml(VALUE_LINE)}</p>
+<p class="actions"><a class="button button-primary" href="${DASHBOARD_PATH}">Sign in</a> <a class="button" href="#${CONNECT_ID}">Read the docs</a></p>
+${agreementNotice("signing in")}
+</section>`;
+}
+
+function examplesSection(): string {
+  return contentSection("examples", "What you can ask", `<ul class="examples">\n${listItems(EXAMPLE_PROMPTS)}\n</ul>`);
+}
+
+function connectSection(serverUrl: string): string {
+  const body = `<ol class="steps">
+<li><a href="${DASHBOARD_PATH}">Sign in</a> with your Google account.</li>
+<li>Create an API key in the dashboard and copy it. It is shown only once.</li>
+<li>Add the server to an MCP client that lets you set a request header, such as Claude Code or Cursor.<br>Server URL: <code>${escapeHtml(serverUrl)}</code><br>Header: <code>${escapeHtml(BEARER_HEADER)}</code></li>
+</ol>
+<p>Claude.ai and Claude Desktop custom connectors cannot send a header. Sign-in from AI assistants is coming later.</p>`;
+  return contentSection(CONNECT_ID, "Connect in 3 steps", body);
+}
+
+function toolsSection(): string {
+  const tools = COVERED_TOOLS.map((tool) => `<li><code>${tool.name}</code> ${escapeHtml(tool.summary)}</li>`).join("\n");
+  return contentSection(
+    "tools",
+    "What is covered",
+    `<p>This build has these ${COVERED_TOOLS.length} tools.</p>\n<ul class="tools">\n${tools}\n</ul>`,
+  );
+}
+
+function sourcesSection(): string {
+  return contentSection(
+    "sources",
+    "Data sources",
+    `<p>Data comes, or will come, from these free public sources. The Egyptian Exchange has not given permission to redistribute it.</p>\n<ul>\n${listItems(DATA_SOURCES)}\n</ul>`,
+  );
+}
+
+function noticeSection(): string {
+  return contentSection("notice", "Important notice", NOTICE_SENTENCES.map((sentence) => `<p>${escapeHtml(sentence)}</p>`).join("\n"));
 }
 
 function siteFooter(): string {

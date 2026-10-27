@@ -22,7 +22,7 @@ Session: HMAC-SHA-256 signed cookie `__Host-egx_session` (`user id`, `exp` 12 h)
 
 | Method and path | Behavior |
 |---|---|
-| `GET /` | Public landing page: what the server is, delayed and unofficial notice, sources, link to README and dashboard, and next to the dashboard link "By signing in you agree to the Terms of use and acknowledge the Privacy policy" (both linked) |
+| `GET /` | Public home page (spec 003): hero with "Sign in" (`/dashboard`) and "Read the docs" (`#connect`) and, next to them, "By signing in you agree to the Terms of use and acknowledge the Privacy policy" (both linked); example prompts; connect in 3 steps showing the MCP address `<origin>/mcp` (origin from `PUBLIC_ORIGIN`, or the request origin when it is empty; `500` when it is invalid) and `Authorization: Bearer <your key>`; the 5 registered tools; data sources; delayed, unofficial, not advice notice. No D1 or KV read, no cookie, no external link |
 | `GET /privacy` | Public static privacy policy (spec 002, FR-L03). No session, no cookies, no D1 or KV read. Other methods `404` |
 | `GET /terms` | Public static terms of use (spec 002, FR-L04). No session, no cookies, no D1 or KV read. Other methods `404` |
 | `GET /dashboard/login` | Redirect to Google (state cookie, PKCE) |
