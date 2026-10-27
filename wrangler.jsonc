@@ -3,6 +3,7 @@
   "main": "src/index.ts",
   "compatibility_date": "2026-10-01",
   "compatibility_flags": ["nodejs_compat"],
+  "keep_vars": true,
   "d1_databases": [
     {
       "binding": "DB",
@@ -38,6 +39,7 @@
     "ADJUST_MAX_ROWS_PER_DAY": "10000",
     "ADJUST_MAX_ACTIONS_PER_RUN": "2",
     "PERSONAL_DAILY_ROWS": "5000",
-    "PUBLIC_ORIGIN": "https://egx-mcp.essawy.workers.dev"
+    "PUBLIC_ORIGIN": "https://egx-mcp.essawy.workers.dev",
+    "GOOGLE_CLIENT_ID": "948374712014-itaqit8nkav80ene7ce700hj10rrov7k.apps.googleusercontent.com"
   }
 }
