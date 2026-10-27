@@ -7,12 +7,13 @@
     {
       "binding": "DB",
       "database_name": "egx",
+      "database_id": "795e9797-99a0-4a01-9a6d-a5a79721221a",
       "migrations_dir": "migrations"
     }
   ],
   "kv_namespaces": [
-    { "binding": "DATA" },
-    { "binding": "OAUTH_KV" }
+    { "binding": "DATA", "id": "2997b30bb1dc4829ad2ecf78715ef1b8" },
+    { "binding": "OAUTH_KV", "id": "730c6805604c4bb882cf978d7cbb41a7" }
   ],
   "ratelimits": [
     {
