@@ -2,7 +2,6 @@ import { InMemoryTransport, type McpServer } from "@modelcontextprotocol/server"
 import { z } from "zod";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { AuthProps } from "../../src/auth/api-keys";
-import { COVERED_TOOLS } from "../../src/http/views";
 import { NOTICE } from "../../src/mcp/envelope";
 import { createServer, defineTool, type ToolContext } from "../../src/mcp/server";
 
@@ -203,7 +202,6 @@ describe("createServer", () => {
     await vi.waitFor(() => expect(responses[2]).toBeDefined());
     expect(responses[1]?.result?.capabilities).toMatchObject({ tools: {} });
     const tools = responses[2]?.result?.tools as { name: string }[];
-    expect(tools.map((tool) => tool.name)).toEqual(COVERED_TOOLS.map((tool) => tool.name));
     expect(tools.map((tool) => tool.name)).toEqual([
       "search",
       "get_quotes",

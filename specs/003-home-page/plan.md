@@ -131,3 +131,7 @@ Row `GET /` amended by the planner in this plan run (already in the diff).
 
 - `src/http/legal.ts` has its own private `section` helper with a different shape (no `id` on `<section>`, paragraphs only). Kept separate; merging both is a later cleanup (one shared helper in `views.ts`, about 15 lines).
 - `LANDING_PATH` in `dashboard.ts` duplicates `HOME_PATH`; out of scope, unchanged.
+
+## Amendment 1: very simple home page
+
+The owner asked for a much simpler page. `landingView(serverUrl)` now renders only the product name, one sentence, one Sign in button with the terms and privacy agreement line, a "Connect your assistant" block (server URL and Authorization header in monospace boxes with one note), one independence and data notice, and a footer with the privacy policy, terms and GitHub. The examples, three step guide, tool list and data source sections, the "Read the docs" button and `EXAMPLE_PROMPTS`, `COVERED_TOOLS`, `NOTICE_SENTENCES` are removed, with the `MAX_SYMBOLS` export. The false claim that Claude custom connectors cannot send a header is removed: Claude custom connectors take a request header and are named as supported. The stylesheet takes the new tokens (lapis accent, 38rem column, serif title and sentence, system fonts only). The shared footer gains the GitHub link on every page. The sign-in agreement keeps the shared sentence ("agree to the Terms of use and acknowledge the Privacy policy") so the home, consent and legal pages stay consistent.
