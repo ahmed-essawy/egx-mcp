@@ -18,18 +18,22 @@ import { tradingViewIndices, tradingViewStocks } from "../providers/tradingview"
 import type { ProviderIndex, ProviderQuote, StockQuoteProvider } from "../providers/types";
 import { getCalendarRow, recentCalendar } from "../store/d1/calendar";
 import { raiseNotices, type NewNotice } from "../store/d1/events";
+import { getJobState, markJobRun } from "../store/d1/jobs";
 import {
   getDirectory,
   getSnapshot,
   putLastSessionSnapshot,
   putSnapshotIfChanged,
+  type Directory,
   type IndexEntry,
   type QuoteEntry,
   type Snapshot,
 } from "../store/kv";
 import { errorMessage, jobFailedNotice } from "./errors";
+import { LISTING_SYNC_STEP, syncListings } from "./listing-sync";
 
 const JOB = "snapshot";
+const BOOTSTRAP_JOB = "listing_bootstrap";
 const STOCKS_STEP = "stocks";
 const INDICES_STEP = "indices";
 const NO_INDICES = "no indices returned";
@@ -319,14 +323,27 @@ async function persist(env: Env, next: Snapshot, isWindowEnd: boolean): Promise<
   if (isWindowEnd && !next.session.noTradesToday) await putLastSessionSnapshot(env, next);
 }
 
+async function ensureDirectory(env: Env, today: CairoParts, now: number): Promise<Directory | null> {
+  const directory = await getDirectory(env);
+  if (directory !== null) return directory;
+  if ((await getJobState(env.DB, BOOTSTRAP_JOB))?.lastRunDate === today.date) return null;
+  await markJobRun(env.DB, BOOTSTRAP_JOB, today.date);
+  try {
+    return await syncListings(env, now, BOOTSTRAP_JOB);
+  } catch (error) {
+    await raiseNotices(env.DB, [jobFailedNotice(BOOTSTRAP_JOB, LISTING_SYNC_STEP, "", errorMessage(error), now)]);
+    return null;
+  }
+}
+
 export async function snapshotJob(env: Env, now: number): Promise<string | undefined> {
   const today = cairoParts(now);
+  const directory = await ensureDirectory(env, today, now);
   const row = await getCalendarRow(env.DB, today.date);
   const window = refreshWindow(row);
   const isWindowEnd = today.time === window.end;
   if (!isInsideWindow(today, row, window)) return SKIPPED_OUTSIDE_WINDOW;
   if (!isOnCadence(env, today, isWindowEnd)) return SKIPPED_OFF_CADENCE;
-  const directory = await getDirectory(env);
   const { acquired, fetchedIndices } = await fetchMarket(env, directory?.tickerToIsin ?? {}, now);
   if (acquired.served !== null) {
     const previous = await getSnapshot(env);

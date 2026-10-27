@@ -2,7 +2,7 @@ import { env } from "cloudflare:test";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { normalizeArabic } from "../../src/domain/arabic";
 import { endOfDayJob } from "../../src/jobs/end-of-day";
-import type { Directory, DirectoryFund } from "../../src/store/kv";
+import type { DirectoryFund } from "../../src/store/kv";
 import mubasherListed from "../fixtures/mubasher-listed-p1.json";
 import tradingViewScan from "../fixtures/tradingview-egypt-scan.json";
 import { restoreBindings, setBindings } from "../helpers/bindings";
@@ -10,12 +10,15 @@ import {
   clearStores,
   createJobRunner,
   failingUpstream,
+  firstPageOnly,
   fixtureResponse,
   notFound,
+  readDirectory,
+  readLastRunDate,
   readNotices,
   requestUrl,
 } from "../helpers/jobs";
-import type { Upstream } from "../helpers/jobs";
+import type { PageUpstream, Upstream } from "../helpers/jobs";
 import { defaultSnapshot, seedCalendar, seedDirectory, seedSnapshot } from "../helpers/seed";
 import { cairoSummerEpoch } from "../helpers/time";
 
@@ -34,7 +37,6 @@ const SNAPSHOT_KEY = "snapshot:v1";
 const DIRECTORY_KEY = "directory:v1";
 const TRADINGVIEW_SCAN_URL = "https://scanner.tradingview.com/egypt/scan";
 const MUBASHER_LISTED_URL = "https://www.mubasher.info/api/1/listed-companies";
-const FIRST_PAGE = 1;
 const NAME_COLUMN = 0;
 const ISIN_COLUMN = 2;
 const STALE_ALIAS_SECONDS = 7 * 24 * 60 * 60;
@@ -49,7 +51,6 @@ const PROVIDER_ALIAS = "comi.ca";
 const HOLIDAY = { date: TODAY, kind: "holiday" } as const;
 const FUND: DirectoryFund = ["fund-1", "صندوق", "Fund", null, "EGP", "صندوق", "fund"];
 
-type PageUpstream = (page: number) => Response | Promise<Response>;
 type Upstreams = { tradingView: Upstream; listed: PageUpstream };
 type Scan = typeof tradingViewScan;
 type Listed = typeof mubasherListed;
@@ -64,11 +65,6 @@ type SymbolRow = {
   free_float_shares: number | null;
 };
 type AliasRow = { isin: string; kind: string; value: string; first_seen: number; last_seen: number };
-
-const firstPageOnly =
-  (body: Listed): PageUpstream =>
-  (page) =>
-    Response.json(page === FIRST_PAGE ? body : { ...body, rows: [] });
 
 function scanWithColumn(ticker: string, column: number, value: string): Scan {
   return {
@@ -121,23 +117,9 @@ async function readAliases(): Promise<AliasRow[]> {
   return results;
 }
 
-async function readDirectory(): Promise<Directory> {
-  const directory = await env.DATA.get<Directory>(DIRECTORY_KEY, { type: "json" });
-  if (!directory) throw new Error("directory not written");
-  return directory;
-}
-
 async function listingSyncFailures() {
   const failures = await readNotices("job_failed");
   return failures.filter((notice) => notice.details.step === LISTING_SYNC_STEP);
-}
-
-async function readLastRunDate(): Promise<string | null> {
-  const row = await env.DB
-    .prepare("SELECT last_run_date FROM job_state WHERE job = ?1")
-    .bind(END_OF_DAY_JOB)
-    .first<{ last_run_date: string | null }>();
-  return row?.last_run_date ?? null;
 }
 
 async function bootstrap(): Promise<void> {
@@ -170,7 +152,7 @@ describe("endOfDayJob listing sync", () => {
       expect(symbols.every((symbol) => symbol.status === "active")).toBe(true);
       expect(runner.kvWrites.filter((key) => key === DIRECTORY_KEY)).toHaveLength(1);
       expect((await readDirectory()).symbols).toHaveLength(LISTED_COUNT);
-      expect(await readLastRunDate()).toBe(TODAY);
+      expect(await readLastRunDate(END_OF_DAY_JOB)).toBe(TODAY);
       expect(await listingSyncFailures()).toEqual([]);
     });
 
@@ -366,7 +348,7 @@ describe("endOfDayJob listing sync", () => {
       expect(fetchStub).not.toHaveBeenCalled();
       expect(runner.kvWrites).toEqual([]);
       expect(await readSymbols()).toEqual([]);
-      expect(await readLastRunDate()).toBe(TODAY);
+      expect(await readLastRunDate(END_OF_DAY_JOB)).toBe(TODAY);
     });
 
     it("runs the sync when noTradesToday belongs to an earlier session date", async () => {

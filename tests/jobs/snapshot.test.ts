@@ -2,20 +2,25 @@ import { env } from "cloudflare:test";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { snapshotJob } from "../../src/jobs/snapshot";
 import type { QuoteEntry, Snapshot } from "../../src/store/kv";
+import mubasherListed from "../fixtures/mubasher-listed-p1.json";
 import mubasherPrices from "../fixtures/mubasher-prices-all.json";
 import tradingViewScan from "../fixtures/tradingview-egypt-scan.json";
 import tradingViewGlobalScan from "../fixtures/tradingview-global-scan.json";
 import { restoreBindings, setBindings } from "../helpers/bindings";
 import {
+  bindMember,
   clearStores,
   createJobRunner,
   failingUpstream,
+  firstPageOnly,
   fixtureResponse,
   notFound,
+  readDirectory,
+  readLastRunDate,
   readNotices,
   requestUrl,
 } from "../helpers/jobs";
-import type { Upstream } from "../helpers/jobs";
+import type { PageUpstream, Upstream } from "../helpers/jobs";
 import {
   DIRECTORY_KEY,
   LAST_SESSION_KEY,
@@ -23,6 +28,7 @@ import {
   seedDirectory,
   seedSnapshot,
   seedSymbols,
+  setNow,
   SNAPSHOT_KEY,
   stockSymbol,
   syntheticIsin,
@@ -44,6 +50,11 @@ const MUBASHER = "mubasher";
 const TRADINGVIEW_SCAN_URL = "https://scanner.tradingview.com/egypt/scan";
 const TRADINGVIEW_INDEX_URL = "https://scanner.tradingview.com/global/scan";
 const MUBASHER_PRICES_URL = "https://www.mubasher.info/api/1/stocks/prices/all";
+const MUBASHER_LISTED_URL = "https://www.mubasher.info/api/1/listed-companies";
+const BOOTSTRAP_JOB = "listing_bootstrap";
+const BOOTSTRAP_TABLES = [...STORE_TABLES, "job_state", "symbols", "symbol_aliases"];
+const NEXT_SESSION_DATE = "2026-10-26";
+const OUTSIDE_WINDOW_TIME = "09:00";
 const TRADE_DATE_COLUMN = 12;
 const COMI_ISIN = "EGS60121C018";
 const ETEL_ISIN = "EGS48031C016";
@@ -86,7 +97,7 @@ const INDEX_STEP = "indices";
 
 type MarketRow = { index: number; changePct: number; volume: number; value: number; sessionTime?: number };
 
-type Upstreams = { tradingView: Upstream; mubasher: Upstream; indices: Upstream };
+type Upstreams = { tradingView: Upstream; mubasher: Upstream; indices: Upstream; listed: PageUpstream };
 
 function scanWithTradeDate(sessionTime: number) {
   return {
@@ -108,6 +119,10 @@ function stubFetch(upstreams: Partial<Upstreams> = {}) {
     if (url.startsWith(TRADINGVIEW_SCAN_URL)) return (upstreams.tradingView ?? fixtureResponse(tradingViewScan))();
     if (url.startsWith(TRADINGVIEW_INDEX_URL)) return (upstreams.indices ?? fixtureResponse(tradingViewGlobalScan))();
     if (url.startsWith(MUBASHER_PRICES_URL)) return (upstreams.mubasher ?? fixtureResponse(mubasherPrices))();
+    if (url.startsWith(MUBASHER_LISTED_URL)) {
+      const page = Number(new URL(url).searchParams.get("page"));
+      return (upstreams.listed ?? firstPageOnly(mubasherListed))(page);
+    }
     return notFound();
   });
   vi.stubGlobal("fetch", stub);
@@ -211,6 +226,23 @@ function quoteEntry(ticker: string, price: number, tradeDate: string): QuoteEntr
   };
 }
 
+function requestedUrls(fetchStub: ReturnType<typeof stubFetch>): string[] {
+  return fetchStub.mock.calls.map(([input]) => requestUrl(input));
+}
+
+function failingSymbolInserts(): Env {
+  const db = new Proxy(env.DB, {
+    get(target, property) {
+      if (property !== "prepare") return bindMember(target, property);
+      return (sql: string) => {
+        if (sql.trimStart().startsWith("INSERT INTO symbols")) throw new Error("symbols write failed");
+        return target.prepare(sql);
+      };
+    },
+  });
+  return Object.create(env, { DB: { value: db } }) as Env;
+}
+
 async function readSnapshot(): Promise<Snapshot> {
   const snapshot = await env.DATA.get<Snapshot>(SNAPSHOT_KEY, { type: "json" });
   if (!snapshot) throw new Error("snapshot not written");
@@ -304,6 +336,91 @@ describe("snapshotJob", () => {
       await runner.run("13:45");
       expect(fetchStub).toHaveBeenCalled();
       expect(runner.kvWrites).toContain(SNAPSHOT_KEY);
+    });
+  });
+
+  describe("directory bootstrap", () => {
+    beforeEach(async () => {
+      await clearStores([SNAPSHOT_KEY, LAST_SESSION_KEY, DIRECTORY_KEY], BOOTSTRAP_TABLES);
+    });
+
+    it("builds the directory on the first in-window run and maps that tick's quotes", async () => {
+      stubFetch();
+      const runner = createRunner();
+
+      await runner.run();
+
+      expect((await readDirectory()).tickerToIsin.COMI).toBe(COMI_ISIN);
+      expect((await readSnapshot()).quotes[COMI_ISIN]).toMatchObject({ t: "COMI" });
+      expect(await readLastRunDate(BOOTSTRAP_JOB)).toBe(SESSION_DATE);
+    });
+
+    it("builds the directory outside the window and skips the market fetch", async () => {
+      const fetchStub = stubFetch();
+      const runner = createRunner();
+
+      expect(await runner.run(OUTSIDE_WINDOW_TIME)).toBe(SKIPPED_OUTSIDE_WINDOW);
+
+      expect(runner.kvWrites).toEqual([DIRECTORY_KEY]);
+      expect(requestedUrls(fetchStub)).not.toContain(TRADINGVIEW_INDEX_URL);
+      expect(requestedUrls(fetchStub).filter((url) => url.startsWith(MUBASHER_PRICES_URL))).toEqual([]);
+    });
+
+    it("builds the directory on a holiday", async () => {
+      await seedCalendar([HOLIDAY]);
+      stubFetch();
+      const runner = createRunner();
+
+      expect(await runner.run()).toBe(SKIPPED_OUTSIDE_WINDOW);
+
+      expect(runner.kvWrites).toEqual([DIRECTORY_KEY]);
+      expect((await readDirectory()).tickerToIsin.COMI).toBe(COMI_ISIN);
+    });
+
+    it("does not rebuild a present directory", async () => {
+      await seedDirectory({ tickerToIsin: TICKER_TO_ISIN });
+      const fetchStub = stubFetch();
+      const runner = createRunner();
+
+      await runner.run(OUTSIDE_WINDOW_TIME);
+      await runner.run();
+
+      expect(requestedUrls(fetchStub).filter((url) => url.startsWith(MUBASHER_LISTED_URL))).toEqual([]);
+      expect(await readLastRunDate(BOOTSTRAP_JOB)).toBeNull();
+      expect(runner.kvWrites).not.toContain(DIRECTORY_KEY);
+    });
+
+    it("runs the bootstrap once per Cairo date after a failure", async () => {
+      const fetchStub = stubFetch({ tradingView: failingUpstream });
+      const runner = createRunner();
+
+      await runner.run(OUTSIDE_WINDOW_TIME);
+      const listedAfterFirstRun = requestedUrls(fetchStub).filter((url) => url.startsWith(MUBASHER_LISTED_URL));
+      await runner.run("09:01");
+
+      expect(listedAfterFirstRun.length).toBeGreaterThan(0);
+      expect(requestedUrls(fetchStub).filter((url) => url.startsWith(MUBASHER_LISTED_URL))).toEqual(listedAfterFirstRun);
+      const failures = await readNotices("job_failed");
+      expect(failures.map((notice) => notice.subject)).toEqual([`${BOOTSTRAP_JOB}:listingSync:${TRADINGVIEW}`]);
+      expect(await env.DATA.get(DIRECTORY_KEY)).toBeNull();
+
+      stubFetch();
+      await runner.run(OUTSIDE_WINDOW_TIME, NEXT_SESSION_DATE);
+
+      expect((await readDirectory()).tickerToIsin.COMI).toBe(COMI_ISIN);
+    });
+
+    it("keeps the snapshot running when the bootstrap throws", async () => {
+      const fetchStub = stubFetch();
+      const now = cairoSummerEpoch(SESSION_DATE, DEFAULT_RUN_TIME);
+      setNow(now);
+
+      await expect(snapshotJob(failingSymbolInserts(), now)).resolves.toBeUndefined();
+
+      const failures = (await readNotices("job_failed")).filter((notice) => notice.details.job === BOOTSTRAP_JOB);
+      expect(failures.map((notice) => notice.subject)).toEqual([`${BOOTSTRAP_JOB}:listingSync:`]);
+      expect(await env.DATA.get(SNAPSHOT_KEY)).toBeNull();
+      expect(requestedUrls(fetchStub).some((url) => url.startsWith(MUBASHER_PRICES_URL))).toBe(true);
     });
   });
 

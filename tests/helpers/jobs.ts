@@ -1,15 +1,23 @@
 import { env } from "cloudflare:test";
-import { __resetKvMemo } from "../../src/store/kv";
-import { setNow } from "./seed";
+import { getJobState } from "../../src/store/d1/jobs";
+import { __resetKvMemo, type Directory } from "../../src/store/kv";
+import { DIRECTORY_KEY, setNow } from "./seed";
 import { cairoSummerEpoch } from "./time";
 
 export type Upstream = () => Response | Promise<Response>;
+export type PageUpstream = (page: number) => Response | Promise<Response>;
 export type StoredNotice = { kind: string; subject: string; details: Record<string, unknown> };
 
 export const fixtureResponse =
   (body: unknown): Upstream =>
   () =>
     Response.json(body);
+const FIRST_PAGE = 1;
+
+export const firstPageOnly =
+  (body: { rows: unknown[] }): PageUpstream =>
+  (page) =>
+    Response.json(page === FIRST_PAGE ? body : { ...body, rows: [] });
 export const failingUpstream: Upstream = () => {
   throw new Error("connection reset");
 };
@@ -19,7 +27,7 @@ export function requestUrl(input: RequestInfo | URL): string {
   return input instanceof Request ? input.url : String(input);
 }
 
-function bindMember(target: object, property: string | symbol): unknown {
+export function bindMember(target: object, property: string | symbol): unknown {
   const member = Reflect.get(target, property);
   return typeof member === "function" ? member.bind(target) : member;
 }
@@ -75,4 +83,14 @@ export async function clearStores(kvKeys: string[], tables: string[]): Promise<v
   await Promise.all(kvKeys.map((key) => env.DATA.delete(key)));
   await env.DB.batch(tables.map((table) => env.DB.prepare(`DELETE FROM ${table}`)));
   __resetKvMemo();
+}
+
+export async function readLastRunDate(job: string): Promise<string | null> {
+  return (await getJobState(env.DB, job))?.lastRunDate ?? null;
+}
+
+export async function readDirectory(): Promise<Directory> {
+  const directory = await env.DATA.get<Directory>(DIRECTORY_KEY, { type: "json" });
+  if (!directory) throw new Error("directory not written");
+  return directory;
 }
