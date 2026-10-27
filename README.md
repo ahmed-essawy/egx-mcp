@@ -2,11 +2,13 @@
 
 An MCP (Model Context Protocol) server that gives AI assistants read access to Egyptian Exchange (EGX) market data: stock quotes and indices today, with price history, funds, dividends, financial figures, gold, silver and the dollar rate coming later. It runs as one Cloudflare Worker on the free tier. Anyone with a Google account can sign in and use it from Claude, ChatGPT or Cursor.
 
-Status: the server is not yet deployed, and no permission from EGX or EGID to share the data has been obtained yet. See [Data sources and limits](#data-sources-and-limits).
+Status: the MVP runs at <https://egx-mcp.essawy.workers.dev/>, and no permission from EGX or EGID to share the data has been obtained yet. See [Data sources and limits](#data-sources-and-limits).
 
 Current build (MVP): only 5 tools are enabled (`search`, `get_quotes`, `get_market_overview`, `get_indices` and `get_daily_summary`). Sign-in with Google from Claude and ChatGPT is not available yet (coming later), so connect with an API key from the dashboard. The `admin` tool, portfolio, price levels, funds, metals and the other tools are not built yet, so the owner tasks, the holiday table and the notices described below are planned. Parts of this guide that describe later work are marked "(coming later)".
 
 ## Overview
+
+The server publishes its home page at <https://egx-mcp.essawy.workers.dev/>.
 
 What the server does:
 
@@ -52,24 +54,24 @@ Permission: EGX and EGID have not yet given permission to share this data. The s
 
 ## Connect from Claude
 
-You need the server address. Use `<PUBLIC_ORIGIN>` below for it (the owner gets it after deploying, see [Install and deploy from a clean Windows machine](#install-and-deploy-from-a-clean-windows-machine)). The MCP address is `<PUBLIC_ORIGIN>/mcp`.
+The server address is `https://egx-mcp.essawy.workers.dev` and the MCP address is `https://egx-mcp.essawy.workers.dev/mcp`. If you deploy your own copy, use your own address (`<PUBLIC_ORIGIN>`) instead, see [Install and deploy from a clean Windows machine](#install-and-deploy-from-a-clean-windows-machine).
 
 Sign in with Google (no key needed). This is not available yet (coming later): connecting with sign-in does not work in this build, and a client may fail before it reaches any page because no client registration endpoint exists yet. Use an API key for now (Claude Code can send one, see below).
 
 1. In Claude, open the connectors settings and choose to add a custom connector.
-2. Enter a name (for example `EGX`) and the address `<PUBLIC_ORIGIN>/mcp`, then save.
+2. Enter a name (for example `EGX`) and the address `https://egx-mcp.essawy.workers.dev/mcp`, then save.
 3. Choose to connect. A Google sign-in page opens. Sign in with your Google account.
 4. Read the consent page (it repeats that the data is delayed and informational) and approve.
 5. Start a chat, enable the connector, and ask "What is the price of CIB?".
 
 Alternatively, use an API key:
 
-1. Open `<PUBLIC_ORIGIN>/dashboard` in a browser and sign in with Google.
+1. Open `https://egx-mcp.essawy.workers.dev/dashboard` in a browser and sign in with Google.
 2. Create a key with a name. The full key (it starts with `egx_`) is shown once. Copy it now; after you reload, only its prefix remains. You can have up to 3 active keys, and you can revoke a key on the same page.
-3. In a client that lets you set request headers, send `Authorization: Bearer <your key>` to `<PUBLIC_ORIGIN>/mcp`. Claude.ai and Claude Desktop custom connectors take no headers, so they cannot use a key. Claude Code can:
+3. In a client that lets you set request headers, send `Authorization: Bearer <your key>` to `https://egx-mcp.essawy.workers.dev/mcp`. Claude.ai and Claude Desktop custom connectors take no headers, so they cannot use a key. Claude Code can:
 
    ```text
-   claude mcp add --transport http egx <PUBLIC_ORIGIN>/mcp --header "Authorization: Bearer <your key>"
+   claude mcp add --transport http egx https://egx-mcp.essawy.workers.dev/mcp --header "Authorization: Bearer <your key>"
    ```
 
 ## Connect from ChatGPT
@@ -77,15 +79,15 @@ Alternatively, use an API key:
 Sign-in with OAuth is not available yet (coming later). Use an API key for now (see the last paragraph of this section).
 
 1. In ChatGPT, open the settings for connectors and enable developer mode if your plan requires it.
-2. Add a new connector and enter `<PUBLIC_ORIGIN>/mcp` as the server address. Choose OAuth as the sign-in method if asked.
+2. Add a new connector and enter `https://egx-mcp.essawy.workers.dev/mcp` as the server address. Choose OAuth as the sign-in method if asked.
 3. Choose to connect. Sign in with your Google account, read the consent page and approve.
 4. In a chat, enable the connector and ask "What is the price of CIB?".
 
-If your ChatGPT plan cannot use OAuth connectors, create an API key at `<PUBLIC_ORIGIN>/dashboard` (sign in with Google, create a key, copy it once) and use it as a bearer token where the connector form allows custom headers.
+If your ChatGPT plan cannot use OAuth connectors, create an API key at `https://egx-mcp.essawy.workers.dev/dashboard` (sign in with Google, create a key, copy it once) and use it as a bearer token where the connector form allows custom headers.
 
 ## Connect from Cursor
 
-1. Open `<PUBLIC_ORIGIN>/dashboard` in a browser and sign in with Google.
+1. Open `https://egx-mcp.essawy.workers.dev/dashboard` in a browser and sign in with Google.
 2. Create a key with a name and copy it. It is shown once.
 3. Open Cursor's `mcp.json` (project `.cursor/mcp.json` or your user-level file) and add:
 
@@ -93,7 +95,7 @@ If your ChatGPT plan cannot use OAuth connectors, create an API key at `<PUBLIC_
 {
   "mcpServers": {
     "egx": {
-      "url": "<PUBLIC_ORIGIN>/mcp",
+      "url": "https://egx-mcp.essawy.workers.dev/mcp",
       "headers": {
         "Authorization": "Bearer <your key>"
       }
@@ -278,6 +280,10 @@ Other admin actions: `list_discrepancies` (stock prices that differ between sour
 | `capacity` error: "The free service is at capacity until 00:00 UTC." | The global daily cap is reached. This protects the free tier. | Wait until 00:00 UTC. The owner can raise `GLOBAL_DAILY_CALLS` in `wrangler.jsonc` only while it stays within the free limits. |
 | `rate_limited` error | You passed 10 calls per minute or 100 per day. | Retry at the time in the message. The owner can raise `USER_DAILY_CALLS` or list a user in `UNLIMITED_EMAILS`. |
 | Sign-in fails (error page, `503`, or returned to the client without access) | The Google OAuth client is missing a redirect URI, the secrets are wrong, `PUBLIC_ORIGIN` is not the Worker address, or the daily sign-in storage budget is used up (`503` with `Retry-After`, coming later). | Check the redirect URIs in the Google client against `<PUBLIC_ORIGIN>`, re-run `npx wrangler secret put` for the secrets, check `PUBLIC_ORIGIN`, and retry after the `Retry-After` time. |
-| `unauthorized` | The key was revoked or mistyped, or the account was deleted. | Create a new key at `<PUBLIC_ORIGIN>/dashboard`. A revoked key stops working within 2 minutes. |
+| `unauthorized` | The key was revoked or mistyped, or the account was deleted. | Create a new key at `https://egx-mcp.essawy.workers.dev/dashboard`. A revoked key stops working within 2 minutes. |
 | `forbidden` on `admin` (coming later) | Your Google email is not in `OWNER_EMAILS`. | Add it in `wrangler.jsonc` and deploy again. |
 | Every request fails with a `500`, and the snapshot job throws `invalid config: <name>` during the session window | A value in `wrangler.jsonc` `vars` is invalid, or the combination of caps goes over the free limits (the name `rows written budget` means lowering `GLOBAL_DAILY_CALLS`, `ADJUST_MAX_ROWS_PER_DAY` or `PERSONAL_DAILY_ROWS`). The server checks this on each request, not at start. An invalid `PUBLIC_ORIGIN` (for example without `https://`) also gives a `500` on every request, with nothing logged. | Read the name in the error (`wrangler tail` shows it), correct that value in `wrangler.jsonc` and deploy again. For `PUBLIC_ORIGIN`, set the full address with `https://`. |
+
+## Privacy and terms
+
+The server publishes its privacy policy at <https://egx-mcp.essawy.workers.dev/privacy> and its terms of use at <https://egx-mcp.essawy.workers.dev/terms>. For account deletion, write to ahm.elessawy@gmail.com.

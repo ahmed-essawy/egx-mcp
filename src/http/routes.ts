@@ -6,6 +6,7 @@ import {
   logoutHandler,
   revokeKeyHandler,
 } from "./dashboard";
+import { privacyView, termsView } from "./legal";
 import { STATUS_INTERNAL_ERROR, STATUS_NOT_FOUND, STATUS_NOT_IMPLEMENTED, STATUS_OK } from "./status";
 import { HTML_HEADERS, htmlResponse, landingView, messageView, STYLESHEET } from "./views";
 
@@ -36,6 +37,8 @@ export function internalErrorResponse(): Response {
 const ROUTES: Route[] = [
   { method: "GET", pattern: /^\/$/, handler: () => htmlResponse(landingView(), STATUS_OK) },
   { method: "GET", pattern: /^\/styles\.css$/, handler: stylesheetResponse },
+  { method: "GET", pattern: /^\/privacy$/, handler: () => htmlResponse(privacyView(), STATUS_OK) },
+  { method: "GET", pattern: /^\/terms$/, handler: () => htmlResponse(termsView(), STATUS_OK) },
   { method: "GET", pattern: /^\/dashboard\/login$/, handler: loginHandler },
   { method: "GET", pattern: /^\/dashboard\/callback$/, handler: callbackHandler },
   { method: "GET", pattern: /^\/dashboard$/, handler: dashboardHandler },

@@ -5,15 +5,20 @@ import type { ApiKeySummary } from "../store/d1/users";
 export const KEY_NAME_MAX_LENGTH = 40;
 const NEVER_USED = "never";
 const UNKNOWN_DATE = "unknown";
+export const HOME_PATH = "/";
+export const PRIVACY_PATH = "/privacy";
+export const TERMS_PATH = "/terms";
 const STYLESHEET_PATH = "/styles.css";
 const README_URL = "https://github.com/ahmed-essawy/egx-mcp#readme";
-const DATA_SOURCES = [
+export const DATA_SOURCES = [
   "EGX website",
   "TradingView",
   "Mubasher Info",
   "iSagha",
   "Fund managers' own sites",
 ];
+export const TERMS_LINK = `<a href="${TERMS_PATH}">Terms of use</a>`;
+export const PRIVACY_LINK = `<a href="${PRIVACY_PATH}">Privacy policy</a>`;
 const DISCLAIMER = "Data is delayed, unofficial and informational only.";
 
 const HTML_ESCAPES: Record<string, string> = {
@@ -26,7 +31,8 @@ const HTML_ESCAPES: Record<string, string> = {
 
 export const STYLESHEET = `
 body { font-family: system-ui, sans-serif; line-height: 1.5; margin: 0; color: #1a1a1a; background: #ffffff; }
-main { max-width: 48rem; margin: 0 auto; padding: 1rem; }
+main, footer { max-width: 48rem; margin: 0 auto; padding: 1rem; }
+footer { border-top: 1px solid #767676; }
 a { color: #0b4f9c; }
 .skip-link { position: absolute; left: -999px; }
 .skip-link:focus { left: 1rem; top: 1rem; background: #ffffff; padding: 0.5rem; }
@@ -83,6 +89,7 @@ export function page(title: string, bodyHtml: string): string {
 <main id="main">
 ${bodyHtml}
 </main>
+${siteFooter()}
 </body>
 </html>`;
 }
@@ -102,7 +109,8 @@ export function landingView(): string {
 ${DATA_SOURCES.map((source) => `<li>${escapeHtml(source)}</li>`).join("\n")}
 </ul>
 <p><a href="${README_URL}">Read the README</a></p>
-<p><a href="/dashboard">Sign in to manage your API keys</a></p>`,
+<p><a href="/dashboard">Sign in to manage your API keys</a></p>
+${agreementNotice("signing in")}`,
   );
 }
 
@@ -116,6 +124,7 @@ export function consentView(input: ConsentInput): string {
 ${scopes}
 </ul>
 <p>${escapeHtml(DISCLAIMER)}</p>
+${agreementNotice("authorizing")}
 ${csrfField(input.csrf)}`,
   );
 }
@@ -132,6 +141,14 @@ export function dashboardView(input: DashboardInput): string {
     logoutForm(input.csrf),
   ];
   return page("Dashboard", body.filter((section) => section !== "").join("\n"));
+}
+
+function siteFooter(): string {
+  return `<footer><nav aria-label="Site"><a href="${HOME_PATH}">Home</a> ${PRIVACY_LINK} ${TERMS_LINK}</nav></footer>`;
+}
+
+function agreementNotice(action: string): string {
+  return `<p>By ${action} you agree to the ${TERMS_LINK} and acknowledge the ${PRIVACY_LINK}.</p>`;
 }
 
 function csrfField(csrf: string): string {

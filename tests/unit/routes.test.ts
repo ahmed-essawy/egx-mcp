@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { privacyView, termsView } from "../../src/http/legal";
 import { defaultHandler } from "../../src/http/routes";
 
 const ORIGIN = "https://egx.example.com";
@@ -27,6 +28,23 @@ describe("defaultHandler", () => {
   });
 
   it.each([
+    ["/privacy", privacyView, "<h1>Privacy policy</h1>"],
+    ["/terms", termsView, "<h1>Terms of use</h1>"],
+  ])("serves %s as HTML with the security headers and no cookie", async (path, view, heading) => {
+    const response = await call(path);
+    expect(response.status).toBe(200);
+    expect(response.headers.get("content-type")).toBe("text/html; charset=utf-8");
+    expect(response.headers.get("content-security-policy")).toBe("default-src 'self'; frame-ancestors 'none'");
+    expect(response.headers.get("x-content-type-options")).toBe("nosniff");
+    expect(response.headers.get("referrer-policy")).toBe("same-origin");
+    expect(response.headers.get("cache-control")).toBe("no-store");
+    expect(response.headers.get("set-cookie")).toBeNull();
+    const body = await response.text();
+    expect(body).toBe(view());
+    expect(body).toContain(heading);
+  });
+
+  it.each([
     ["GET", "/authorize"],
     ["POST", "/authorize"],
     ["GET", "/callback/google"],
@@ -39,6 +57,8 @@ describe("defaultHandler", () => {
   it.each([
     ["GET", "/missing"],
     ["POST", "/"],
+    ["POST", "/privacy"],
+    ["POST", "/terms"],
     ["GET", "/dashboard/keys/key-1/revoke"],
   ])("answers %s %s with 404", async (method, path) => {
     expect((await call(path, method)).status).toBe(NOT_FOUND);

@@ -22,7 +22,9 @@ Session: HMAC-SHA-256 signed cookie `__Host-egx_session` (`user id`, `exp` 12 h)
 
 | Method and path | Behavior |
 |---|---|
-| `GET /` | Public landing page: what the server is, delayed and unofficial notice, sources, link to README and dashboard |
+| `GET /` | Public landing page: what the server is, delayed and unofficial notice, sources, link to README and dashboard, and next to the dashboard link "By signing in you agree to the Terms of use and acknowledge the Privacy policy" (both linked) |
+| `GET /privacy` | Public static privacy policy (spec 002, FR-L03). No session, no cookies, no D1 or KV read. Other methods `404` |
+| `GET /terms` | Public static terms of use (spec 002, FR-L04). No session, no cookies, no D1 or KV read. Other methods `404` |
 | `GET /dashboard/login` | Redirect to Google (state cookie, PKCE) |
 | `GET /dashboard/callback` | Verify Google ID token, upsert user, set session, redirect to `/dashboard` |
 | `GET /dashboard` | List keys: `prefix`, `name`, `createdAt`, `lastUsedAt`, `revokedAt`; today's usage per tool |
@@ -31,7 +33,7 @@ Session: HMAC-SHA-256 signed cookie `__Host-egx_session` (`user id`, `exp` 12 h)
 | `POST /dashboard/account/delete` | Confirm field must equal the user's email; deletes the account (FR-036), revokes OAuth grants, clears the cookie |
 | `POST /dashboard/logout` | Clears the cookie |
 
-All HTML responses carry `Content-Security-Policy: default-src 'self'; frame-ancestors 'none'`, `X-Content-Type-Options: nosniff`, `Cache-Control: no-store` (the one-time plaintext key must not be cached; `/styles.css` is static and keeps `Cache-Control: public, max-age=300`), `Referrer-Policy: same-origin` (a stricter `no-referrer` would make browsers send `Origin: null` on form POSTs, and `checkPost` would refuse every dashboard POST). Pages meet WCAG 2.2 AA (labels, focus order, contrast).
+All HTML responses carry `Content-Security-Policy: default-src 'self'; frame-ancestors 'none'`, `X-Content-Type-Options: nosniff`, `Cache-Control: no-store` (the one-time plaintext key must not be cached; `/styles.css` is static and keeps `Cache-Control: public, max-age=300`), `Referrer-Policy: same-origin` (a stricter `no-referrer` would make browsers send `Origin: null` on form POSTs, and `checkPost` would refuse every dashboard POST). Pages meet WCAG 2.2 AA (labels, focus order, contrast). Every HTML page ends with a footer `<nav aria-label="Site">` linking `/`, `/privacy` and `/terms`; the consent page also carries the "By authorizing you agree ..." sentence with both links (spec 002).
 
 ## Scheduled (cron, UTC)
 

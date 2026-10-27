@@ -1,5 +1,17 @@
 import { describe, expect, it } from "vitest";
-import { consentView, dashboardView, escapeHtml, landingView, page, type DashboardInput } from "../../src/http/views";
+import {
+  consentView,
+  dashboardView,
+  escapeHtml,
+  HOME_PATH,
+  landingView,
+  page,
+  PRIVACY_PATH,
+  STYLESHEET,
+  TERMS_PATH,
+  type DashboardInput,
+} from "../../src/http/views";
+import { FOOTER_NAV } from "../helpers/html";
 
 const SCRIPT_PAYLOAD = "<script>alert(1)</script>";
 const ESCAPED_SCRIPT_OPEN = "&lt;script&gt;";
@@ -15,6 +27,9 @@ const NEW_KEY = "egx_new-key-value";
 const FORM_CONTROL_PATTERN = /<(input|select|textarea)\b[^>]*>/gi;
 const HIDDEN_INPUT_PATTERN = /type="hidden"/i;
 const ID_ATTRIBUTE_PATTERN = /\bid="([^"]+)"/i;
+const SIGN_IN_AGREEMENT = "By signing in you agree to the";
+const AUTHORIZE_AGREEMENT = "By authorizing you agree to the";
+const AGREEMENT_PARAGRAPH_PATTERN = /<p>By [^<]*you agree to the[\s\S]*?<\/p>/;
 
 function dashboardInput(overrides: Partial<DashboardInput> = {}): DashboardInput {
   return {
@@ -143,6 +158,15 @@ describe("consentView", () => {
     expect(html).toContain(ESCAPED_SCRIPT_OPEN);
     expect(html).not.toContain(SCRIPT_PAYLOAD);
   });
+
+  it("shows the agreement notice with both policy links", () => {
+    const html = consentView({ clientName: "Client", scopes: ["read"], csrf: CSRF });
+    const notice = AGREEMENT_PARAGRAPH_PATTERN.exec(html)?.[0] ?? "";
+
+    expect(notice).toContain(AUTHORIZE_AGREEMENT);
+    expect(notice).toContain('href="/terms"');
+    expect(notice).toContain('href="/privacy"');
+  });
 });
 
 describe("landingView", () => {
@@ -157,6 +181,30 @@ describe("landingView", () => {
   it("links the README and the dashboard", () => {
     expect(html).toMatch(/href="[^"]*#readme"/);
     expect(html).toContain('href="/dashboard"');
+  });
+
+  it("shows the agreement notice with both policy links after the dashboard link", () => {
+    const notice = AGREEMENT_PARAGRAPH_PATTERN.exec(html)?.[0] ?? "";
+
+    expect(notice).toContain(SIGN_IN_AGREEMENT);
+    expect(notice).toContain('href="/terms"');
+    expect(notice).toContain('href="/privacy"');
+    expect(html.indexOf(SIGN_IN_AGREEMENT)).toBeGreaterThan(html.indexOf('href="/dashboard"'));
+  });
+});
+
+describe("path constants", () => {
+  it("names the home, privacy and terms paths", () => {
+    expect(HOME_PATH).toBe("/");
+    expect(PRIVACY_PATH).toBe("/privacy");
+    expect(TERMS_PATH).toBe("/terms");
+  });
+});
+
+describe("STYLESHEET", () => {
+  it("styles the footer like the main content and separates it with a border", () => {
+    expect(STYLESHEET).toContain("main, footer {");
+    expect(STYLESHEET).toContain("footer { border-top");
   });
 });
 
@@ -183,5 +231,10 @@ describe("page", () => {
 
     expect(output).toContain(ESCAPED_SCRIPT_OPEN);
     expect(output).toContain("<p>body</p>");
+  });
+
+  it("ends with the site footer navigation after the main content", () => {
+    expect(html).toContain(FOOTER_NAV);
+    expect(html.indexOf("</main>")).toBeLessThan(html.indexOf("<footer>"));
   });
 });
