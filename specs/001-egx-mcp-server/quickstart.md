@@ -16,7 +16,7 @@ npx wrangler d1 create egx
 npx wrangler kv namespace create DATA
 npx wrangler kv namespace create OAUTH_KV
 (put the ids in wrangler.jsonc)
-npx wrangler secret put GOOGLE_CLIENT_ID
+(set GOOGLE_CLIENT_ID in the vars of wrangler.jsonc, it is a var and not a secret)
 npx wrangler secret put GOOGLE_CLIENT_SECRET
 npx wrangler secret put SESSION_SECRET
 npx wrangler d1 migrations apply egx --local

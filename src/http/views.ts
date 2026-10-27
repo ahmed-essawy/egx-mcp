@@ -57,7 +57,7 @@ code { font-family: ui-monospace, monospace; overflow-wrap: anywhere; }
 .hero, .connect, .notice { margin-block: 2.5rem; }
 .hero h1, .lead { font-family: ui-serif, Georgia, "Times New Roman", serif; letter-spacing: -0.02em; }
 .hero h1 { font-size: 3rem; line-height: 1.1; margin: 0 0 1rem; }
-.lead { font-size: 1.5rem; line-height: 1.3; max-width: 60ch; margin: 0 0 2.5rem; }
+.lead { font-size: 1.5rem; line-height: 1.3; margin: 0 0 2.5rem; }
 .button { display: inline-block; padding: 0.75rem 1.5rem; border-radius: 0.25rem; font-weight: 600; text-decoration: none; background: var(--link); color: var(--on-link); }
 .agreement, .notice { color: var(--muted); font-size: 0.875rem; }
 .connect { padding: 1.25rem; border: 1px solid var(--border); background: var(--surface); }

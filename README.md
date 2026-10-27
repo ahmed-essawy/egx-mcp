@@ -191,16 +191,15 @@ Steps (run them in a terminal in the cloned folder):
    ```
 
    Each command prints an id. Paste them into `wrangler.jsonc`: the database id as `database_id` in the `DB` entry of `d1_databases`, and each namespace id as `id` in the matching `kv_namespaces` entry (`DATA`, `OAUTH_KV`).
-6. Store the three secrets (each command asks for the value):
+6. Store the two secrets (each command asks for the value):
 
    ```text
-   npx wrangler secret put GOOGLE_CLIENT_ID
    npx wrangler secret put GOOGLE_CLIENT_SECRET
    npx wrangler secret put SESSION_SECRET
    ```
 
-   `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` come from your Google OAuth client. `SESSION_SECRET` is a long random string you make up.
-7. Set your own values in the `vars` of `wrangler.jsonc`: `OWNER_EMAILS` (your Google email, comma separated for several), `UNLIMITED_EMAILS` (optional), and `PUBLIC_ORIGIN` (the Worker address, for example `https://<worker name>.<your workers subdomain>.workers.dev`; you learn the exact address after the first deploy, so set it and deploy again).
+   `GOOGLE_CLIENT_SECRET` comes from your Google OAuth client. `SESSION_SECRET` is a long random string you make up. The Google client id is not a secret: it is `GOOGLE_CLIENT_ID` in the `vars` of `wrangler.jsonc` (step 7). Do not also create a secret with that name, because a secret and a var with the same name conflict.
+7. Set your own values in the `vars` of `wrangler.jsonc`: `GOOGLE_CLIENT_ID` (the client id of your own Google OAuth client, replacing the one in the file), `OWNER_EMAILS` (your Google email, comma separated for several), `UNLIMITED_EMAILS` (optional), and `PUBLIC_ORIGIN` (the Worker address, for example `https://<worker name>.<your workers subdomain>.workers.dev`; you learn the exact address after the first deploy, so set it and deploy again).
 8. Create the tables, locally and then remotely:
 
    ```text
