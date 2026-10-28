@@ -17,7 +17,7 @@ describe("loadConfig", () => {
       userDailyCalls: 100,
       ownerEmails: new Set(["ahm.elessawy@gmail.com"]),
       unlimitedEmails: new Set(["loay.elessawy@gmail.com", "abdelrahman.m.essawy@gmail.com"]),
-      stockProviders: ["egx", "tradingview"],
+      stockProviders: ["tradingview", "mubasher"],
       snapshotEveryMinutes: 1,
       backfillMaxRowsPerDay: 36000,
       adjustMaxRowsPerDay: 10000,

@@ -1,4 +1,3 @@
-import type { CorporateActionKind } from "../domain/adjust";
 import { cairoParts } from "../domain/calendar";
 import { fetchJson } from "./http";
 import {
@@ -8,13 +7,20 @@ import {
   type CorporateActionProvider,
   type FundNavProvider,
   type ListingProvider,
-  type ProviderAction,
   type ProviderFund,
   type ProviderListing,
   type ProviderQuote,
   type StockQuoteProvider,
 } from "./types";
+import {
+  mapMubasherActionKind,
+  parseArabicDate,
+  parseMubasherActionRow,
+  type Row,
+} from "./mubasher-parse";
 import { asString, isPresent } from "./values";
+
+export { mapMubasherActionKind, parseArabicDate, parseMubasherActionRow };
 
 const PROVIDER_ID = "mubasher";
 const PRICES_URL = "https://www.mubasher.info/api/1/stocks/prices/all?country=eg";
@@ -26,39 +32,12 @@ const FUNDS_URL = "https://www.mubasher.info/api/1/funds?country=eg";
 const MAX_FUND_PAGES = 13;
 const FUND_SOURCE_PREFIX = "mubasher:";
 const ACTIONS_URL = "https://www.mubasher.info/api/1/corporate-actions?country=eg";
-const SOURCE_TEXT_SEPARATOR = " | ";
-const ACTION_KIND_PREFIXES: ReadonlyArray<readonly [string, CorporateActionKind]> = [
-  ["توزيع أرباح نقدية", "cash_dividend"],
-  ["توزيع أسهم منحة", "bonus"],
-  ["توزيع أسهم خزينة كأسهم منحة", "bonus"],
-  ["تجزئة", "split"],
-  ["تجميع", "reverse_split"],
-  ["زيادة رأس مال", "rights"],
-  ["تغيير اسم الشركة", "name_change"],
-];
-const ARABIC_DATE = /^(\d{1,2})\s+(\S+)\s+(\d{4})$/;
-const ARABIC_MONTHS = [
-  "يناير",
-  "فبراير",
-  "مارس",
-  "أبريل",
-  "مايو",
-  "يونيو",
-  "يوليو",
-  "أغسطس",
-  "سبتمبر",
-  "أكتوبر",
-  "نوفمبر",
-  "ديسمبر",
-];
 const FUND_CURRENCIES: ReadonlyArray<readonly [string, string]> = [
   ["جنيه", "EGP"],
   ["دولار", "USD"],
 ];
 const MS_PER_SECOND = 1000;
 const NUMBER_NOISE = /[,%]/g;
-
-type Row = Record<string, unknown>;
 
 function asNumber(value: unknown): number | null {
   if (typeof value === "number") return Number.isFinite(value) ? value : null;
@@ -78,41 +57,6 @@ function parseUtcSeconds(value: unknown): number | null {
   if (text === null) return null;
   const milliseconds = Date.parse(`${text.replace(" ", "T")}Z`);
   return Number.isNaN(milliseconds) ? null : milliseconds / MS_PER_SECOND;
-}
-
-export function parseArabicDate(text: string): string | null {
-  const match = ARABIC_DATE.exec(text.trim());
-  if (match === null) return null;
-  const month = ARABIC_MONTHS.indexOf(match[2] as string) + 1;
-  if (month === 0) return null;
-  const day = Number(match[1]);
-  const year = Number(match[3]);
-  const probe = new Date(Date.UTC(year, month - 1, day));
-  if (probe.getUTCMonth() !== month - 1 || probe.getUTCDate() !== day) return null;
-  return `${match[3]}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
-}
-
-export function mapMubasherActionKind(type: string): CorporateActionKind {
-  return ACTION_KIND_PREFIXES.find(([prefix]) => type.startsWith(prefix))?.[1] ?? "other";
-}
-
-function parseOptionalArabicDate(value: unknown): string | null {
-  const text = asString(value);
-  return text === null ? null : parseArabicDate(text);
-}
-
-export function parseMubasherActionRow(row: Row): ProviderAction | null {
-  const ticker = asString(row.url)?.split("/").pop();
-  const exDate = parseOptionalArabicDate(row.effectiveFrom);
-  if (ticker === undefined || ticker === "" || exDate === null) return null;
-  const type = asString(row.type) ?? "";
-  return {
-    ticker,
-    kind: mapMubasherActionKind(type),
-    announcedOn: parseOptionalArabicDate(row.announcedAt),
-    exDate,
-    sourceText: `${type}${SOURCE_TEXT_SEPARATOR}${asString(row.description) ?? ""}`,
-  };
 }
 
 function toQuote(row: Row): ProviderQuote | null {

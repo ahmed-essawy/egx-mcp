@@ -1,4 +1,4 @@
-import { ADJUST_BATCH_OVERHEAD_ROWS } from "./budget";
+import { ADJUST_BATCH_OVERHEAD_ROWS } from "./budget.ts";
 
 export type CorporateActionKind =
   | "cash_dividend"
