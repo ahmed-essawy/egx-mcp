@@ -135,6 +135,25 @@ describe("get_quotes contract", () => {
       });
     });
 
+    it("rounds float noise out of every numeric field", async () => {
+      await seedSnapshot({
+        quotes: {
+          [COMI_ISIN]: {
+            ...quote(COMI_TICKER),
+            p: 122.00000000000001,
+            ch: -0.8999999999999915,
+            chp: -0.7332113021428013,
+            pc: 122.89999999999999,
+            val: 41485002.123456,
+          },
+        },
+      });
+
+      const [item] = payloadOf(await getQuotes(key, [COMI_TICKER])).data.quotes;
+
+      expect(item).toMatchObject({ price: 122, change: -0.9, changePct: -0.73, prevClose: 122.9, value: 41485002.12 });
+    });
+
     it("labels the response delayed with the snapshot source and a Cairo ISO data time", async () => {
       const { data, meta } = payloadOf(await getQuotes(key, [COMI_TICKER]));
 

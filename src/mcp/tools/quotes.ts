@@ -15,6 +15,7 @@ import { defineTool } from "../define-tool";
 import { fail, ok, type Meta } from "../envelope";
 import { envelopeSchema } from "../output-schema";
 import { MAX_SYMBOL_INPUT_LENGTH, resolveSymbol } from "../resolve";
+import { roundPercent, roundPrice, roundTurnover } from "../rounding";
 import { loadMarketClock, sessionMeta, type MarketClock } from "../session";
 import { DIRECTORY_MISSING_MESSAGE, identityOf, identitySchema, newestDataTime } from "../shared";
 
@@ -71,15 +72,15 @@ function quotedItem(entry: DirectorySymbol, quote: QuoteEntry, stale: boolean): 
   return {
     ...identityOf(entry),
     status: entry[5],
-    price: quote.p,
-    open: quote.o,
-    high: quote.h,
-    low: quote.l,
-    prevClose: quote.pc,
-    change: quote.ch,
-    changePct: quote.chp,
+    price: roundPrice(quote.p),
+    open: roundPrice(quote.o),
+    high: roundPrice(quote.h),
+    low: roundPrice(quote.l),
+    prevClose: roundPrice(quote.pc),
+    change: roundPrice(quote.ch),
+    changePct: roundPercent(quote.chp),
     volume: quote.v,
-    value: quote.val,
+    value: roundTurnover(quote.val),
     tradeDate: quote.td,
     dataTime: toCairoIso(quote.tt),
     source: quote.src,

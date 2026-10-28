@@ -15,6 +15,7 @@ import {
 import { defineTool } from "../define-tool";
 import { fail, ok, type Meta } from "../envelope";
 import { envelopeSchema } from "../output-schema";
+import { roundIndex, roundPercent, roundPrice, roundTurnover } from "../rounding";
 import { loadMarketClock, sessionMeta } from "../session";
 import { DIRECTORY_MISSING_MESSAGE, identityOf, identitySchema, newestDataTime } from "../shared";
 
@@ -113,10 +114,10 @@ function moverOf(isin: string, snapshot: Snapshot, symbols: SymbolsByIsin): Move
   return [
     {
       ...identity,
-      price: quote.p,
-      changePct: quote.chp,
+      price: roundPrice(quote.p),
+      changePct: roundPercent(quote.chp),
       volume: quote.v,
-      value: quote.val,
+      value: roundTurnover(quote.val),
     },
   ];
 }
@@ -131,7 +132,7 @@ function sessionSummary(snapshot: Snapshot, top: number, symbols: SymbolsByIsin)
     breadth: snapshot.breadth,
     topGainers: moversOf(snapshot.top.gainers, top, snapshot, symbols),
     topLosers: moversOf(snapshot.top.losers, top, snapshot, symbols),
-    totals: snapshot.totals,
+    totals: { volume: snapshot.totals.volume, value: roundTurnover(snapshot.totals.value) },
   };
 }
 
@@ -139,8 +140,8 @@ function indexItemOf(code: IndexCode, entry: IndexEntry): IndexItem {
   return {
     code,
     name: INDEX_NAMES[code],
-    value: entry.v,
-    changePct: entry.chp,
+    value: roundIndex(entry.v),
+    changePct: roundPercent(entry.chp),
     dataTime: toCairoIso(entry.tt),
     source: entry.src,
   };
