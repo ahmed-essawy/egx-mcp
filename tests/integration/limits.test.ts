@@ -5,7 +5,7 @@ import { RowsCounter, finishCall } from "../../src/limits/usage";
 import { deleteAccount } from "../../src/store/d1/users";
 import { clearState, restoreBindings, setBindings } from "../helpers/bindings";
 import { MS_PER_SECOND } from "../helpers/time";
-import { callTool } from "../helpers/mcp";
+import { callTool, postMcp } from "../helpers/mcp";
 import { seedBars, seedDirectory, seedKey, seedSnapshot, seedUser, setNow } from "../helpers/seed";
 
 const GIVEN_NOW = Date.UTC(2026, 9, 25, 12, 0, 0) / MS_PER_SECOND;
@@ -173,15 +173,13 @@ describe("limits", () => {
       expect(limiter).not.toHaveBeenCalled();
     });
 
-    it("refuses a deleted user with unauthorized", async () => {
+    it("refuses a deleted user uncached key with 401", async () => {
       const { userId, key } = await seedCaller();
       await env.DB.prepare("UPDATE users SET deleted_at = ?1 WHERE id = ?2").bind(GIVEN_NOW, userId).run();
 
-      const refused = await callIndices(key);
+      const refused = await postMcp({ jsonrpc: "2.0", id: 1, method: "tools/list" }, key);
 
-      expect(refused.isError).toBe(true);
-      expect(errorOf(refused).code).toBe("unauthorized");
-      expect(errorOf(refused).message).toBe("Account not found.");
+      expect(refused.status).toBe(401);
       expect(await readUserCalls(userId)).toBe(0);
     });
   });

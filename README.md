@@ -198,7 +198,7 @@ Steps (run them in a terminal in the cloned folder):
    npx wrangler secret put SESSION_SECRET
    ```
 
-   `GOOGLE_CLIENT_SECRET` comes from your Google OAuth client. `SESSION_SECRET` is a long random string you make up. The Google client id is not a secret: it is `GOOGLE_CLIENT_ID` in the `vars` of `wrangler.jsonc` (step 7). Do not also create a secret with that name, because a secret and a var with the same name conflict.
+   `GOOGLE_CLIENT_SECRET` comes from your Google OAuth client. `SESSION_SECRET` is a long random string you make up. The Google client id is not a secret: it is `GOOGLE_CLIENT_ID` in the `vars` of `wrangler.jsonc` (step 7). Do not also create a secret with that name, because a secret and a var with the same name conflict. If you deployed before `GOOGLE_CLIENT_ID` became a var, run `npx wrangler secret delete GOOGLE_CLIENT_ID` once before `npm run deploy`.
 7. Set your own values in the `vars` of `wrangler.jsonc`: `GOOGLE_CLIENT_ID` (the client id of your own Google OAuth client, replacing the one in the file), `OWNER_EMAILS` (your Google email, comma separated for several), `UNLIMITED_EMAILS` (optional), and `PUBLIC_ORIGIN` (the Worker address, for example `https://<worker name>.<your workers subdomain>.workers.dev`; you learn the exact address after the first deploy, so set it and deploy again).
 8. Create the tables, locally and then remotely:
 
@@ -231,7 +231,7 @@ A holiday missing from the table is detected automatically when no trades happen
 
 Update and rollback:
 
-1. To update: pull the new code, run `npm ci`, `npx wrangler d1 migrations apply egx --remote` if there are new migrations, then `npm run deploy`.
+1. To update: pull the new code, run `npm ci`, `npx wrangler d1 migrations apply egx --remote` if there are new migrations, then `npm run deploy`. If you deployed before `GOOGLE_CLIENT_ID` became a var, run `npx wrangler secret delete GOOGLE_CLIENT_ID` once before `npm run deploy`.
 2. To see recent versions: `npx wrangler deployments list`
 3. To go back to the previous version: `npx wrangler rollback`
 

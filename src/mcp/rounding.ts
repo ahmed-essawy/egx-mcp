@@ -5,7 +5,7 @@ const INDEX_DECIMALS = 2;
 
 function roundTo(value: number, decimals: number): number {
   const factor = 10 ** decimals;
-  return Math.round(value * factor) / factor;
+  return (Math.sign(value) * Math.round(Math.abs(value) * factor)) / factor;
 }
 
 function roundedOrNull(value: number | null, decimals: number): number | null {

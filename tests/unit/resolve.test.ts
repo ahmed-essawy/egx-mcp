@@ -158,6 +158,12 @@ describe("resolveSymbol", () => {
     expect(result).toEqual({ ok: false, code: "not_found", candidates: [prefixed, comi] });
   });
 
+  it("returns no suggestions for a one letter input", () => {
+    const single = symbol("EGS00000C901", "QQQ1", null, null);
+
+    expect(resolveSymbol(directory([single]), "q")).toEqual({ ok: false, code: "not_found", candidates: [] });
+  });
+
   it("suggests a ticker that contains the input", () => {
     expect(resolveSymbol(dir, "OMI")).toEqual({ ok: false, code: "not_found", candidates: [comi] });
   });

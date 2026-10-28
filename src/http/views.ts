@@ -39,8 +39,8 @@ const HTML_ESCAPES: Record<string, string> = {
 };
 
 export const STYLESHEET = `
-:root { color-scheme: light dark; --text: #14202b; --muted: #52606d; --background: #f8fafb; --surface: #eef2f6; --border: #c5ced6; --link: #1d4f91; --on-link: #ffffff; --error: #9b1c1c; }
-@media (prefers-color-scheme: dark) { :root { --text: #e7edf3; --muted: #9aa8b5; --background: #0f1720; --surface: #17212b; --border: #2a3744; --link: #8db4f0; --on-link: #0f1720; --error: #ff8a80; } }
+:root { color-scheme: light dark; --text: #14202b; --muted: #52606d; --background: #f8fafb; --surface: #eef2f6; --border: #7d8996; --link: #1d4f91; --on-link: #ffffff; --error: #9b1c1c; }
+@media (prefers-color-scheme: dark) { :root { --text: #e7edf3; --muted: #9aa8b5; --background: #0f1720; --surface: #17212b; --border: #66798b; --link: #8db4f0; --on-link: #0f1720; --error: #ff8a80; } }
 body { font-family: system-ui, sans-serif; line-height: 1.6; margin: 0; color: var(--text); background: var(--background); }
 main, footer { max-width: 38rem; margin: 0 auto; padding: 1.5rem 1rem; }
 footer { border-top: 1px solid var(--border); }

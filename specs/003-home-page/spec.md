@@ -8,21 +8,21 @@
 
 ### User Story 1: Understand the product and sign in (Priority: P1)
 
-A visitor opens the home page, understands in one line what EGX MCP does, and can sign in or jump to the setup guide.
+A visitor opens the home page, understands in one sentence what EGX MCP does, and can sign in.
 
-**Independent Test**: `GET /` returns `200` HTML whose first section has the `<h1>` "EGX MCP", the one-line value, a "Sign in" link to `/dashboard`, a "Read the docs" link to `#connect`, and the agreement sentence with both policy links.
+**Independent Test**: `GET /` returns `200` HTML with the `<h1>` "EGX MCP", the one sentence value line, a single "Sign in" link to `/dashboard`, and the agreement sentence with both policy links. There is no "Read the docs" button.
 
 ### User Story 2: Connect an AI client (Priority: P1)
 
-A visitor follows 3 numbered steps (sign in, create a key, add the MCP address with the bearer header) and connects a client that can send a request header.
+A visitor finds the "Connect your assistant" block with the server URL and the `Authorization: Bearer <your key>` header, each in its own monospace box, and connects Claude (custom connector), Claude Code or Cursor after creating a key.
 
-**Independent Test**: the `#connect` section is an ordered list of 3 steps; step 3 shows the MCP address built from the configured public origin (or the request origin when none is configured) and `Authorization: Bearer <your key>`.
+**Independent Test**: the "Connect your assistant" section shows the MCP address built from the configured public origin (or the request origin when none is configured) and the header line in separate boxes, followed by the one line that names Claude (custom connector, no sign-in, add the header), Claude Code and Cursor.
 
-### User Story 3: Know what is covered and how reliable it is (Priority: P2)
+### User Story 3: Know how reliable the data is (Priority: P2)
 
-A visitor sees example questions, the 5 tools that exist today, the data sources and a notice that the data is delayed, unofficial and not financial advice.
+A visitor reads one plain notice that the service is independent, that the data is delayed, unofficial and not financial advice, and which sources it uses.
 
-**Independent Test**: the page names exactly the 5 registered tools, every data source, and the notice sentences of FR-H06.
+**Independent Test**: the page shows the single notice of FR-H04 and a footer with the privacy policy, terms of use and GitHub links. It lists no tools, examples or separate data source section.
 
 ### Edge Cases
 
@@ -48,16 +48,16 @@ A visitor sees example questions, the 5 tools that exist today, the data sources
 ## Success Criteria
 
 - **SC-H01**: `GET /` answers `200` in the Node-pool unit run with the configured and with the fallback origin.
-- **SC-H02**: The home page names 5 tools and the MCP server registers the same 5 (one test fails if they drift).
+- **SC-H02**: The home page shows only the sign in button, the connection block and the single notice, and none of the removed sections or the false connector claim (tests fail if they return).
 - **SC-H03**: No statement on the home page contradicts the legal pages, the README or the code.
 - **SC-H04**: `npm run typecheck` and the Node-pool unit run pass with no failure beyond the 8 known `usage-store` failures.
 - **SC-H05**: At 375, 1024 and 1440 px the page has no horizontal scrolling (rendered check, or recorded NOT RENDERED).
 
 ## Assumptions
 
-- "Read the docs" points at the in-page `#connect` guide: the public README URL is unknown, and the old `README_URL` constant (a guessed GitHub address) is removed.
+- There is no "Read the docs" button: the connection block is the setup guide, and the old `README_URL` constant (a guessed GitHub address) stays removed.
 - "Sign in" points at `/dashboard`, which redirects a signed-out visitor to Google sign-in and shows the dashboard to a signed-in one.
-- Client wording: the owner named Claude, ChatGPT and Cursor; the page says "an MCP client that lets you set a request header" and names Claude Code and Cursor, because Claude.ai and Claude Desktop connectors take no headers and ChatGPT only where its form allows custom headers (README "Connect from" sections).
+- Client wording: the page names Claude (custom connector, no sign-in, with the `Authorization` request header), Claude Code and Cursor as supported. Claude custom connectors do take a request header, so the earlier claim that they cannot is removed from the page and the README.
 - Logo, favicon and dashboard styling are later runs. Dashboard and legal pages change only through the shared stylesheet (colors become custom properties with the same light values).
 
 ## Amendment 1: very simple home page

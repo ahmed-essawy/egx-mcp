@@ -4,6 +4,7 @@ import type { Directory, DirectoryFund, DirectorySymbol } from "../store/kv";
 export const MAX_SYMBOL_INPUT_LENGTH = 80;
 export const MAX_AMBIGUOUS_CANDIDATES = 10;
 export const MAX_NOT_FOUND_SUGGESTIONS = 5;
+const MIN_SUGGESTION_QUERY_LENGTH = 2;
 const MIN_FUZZY_PREFIX = 3;
 const FUZZY_PREFIX_SHARE = 0.5;
 
@@ -112,6 +113,7 @@ function fuzzyRank(fields: string[], query: string): Rank | null {
 }
 
 function suggestionRank(fields: string[], query: string): Rank | null {
+  if (query.length < MIN_SUGGESTION_QUERY_LENGTH) return null;
   return bestRank(fields, query) ?? fuzzyRank(fields, query);
 }
 

@@ -17,6 +17,11 @@ describe("rounding", () => {
     expect(roundPercent(NOISY_PERCENT)).toBe(-0.73);
   });
 
+  it("rounds a negative half away from zero like a positive half", () => {
+    expect(roundPercent(-0.735)).toBe(-0.74);
+    expect(roundPercent(0.735)).toBe(0.74);
+  });
+
   it("rounds a traded value to two decimals", () => {
     expect(roundTurnover(NOISY_VALUE)).toBe(293871.17);
   });
