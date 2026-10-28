@@ -70,7 +70,7 @@ async function serveCall<I extends StandardSchemaWithJSON, O extends StandardSch
   const rows = new RowsCounter();
   const now = nowSeconds();
   const limits = await checkLimits(env, cfg, auth, now, rows);
-  if (!limits.ok) return fail(limits.code, limits.message, limits.retryAt);
+  if (!limits.ok) return fail(limits.code, limits.message, { retryAt: limits.retryAt });
   let result: CallToolResult;
   try {
     result = await tool.handler(args, { env, cfg, auth, rows, usage: limits.usage, now });

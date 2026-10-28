@@ -105,6 +105,8 @@ describe("defineTool", () => {
     expect(result.isError).toBe(true);
     expect(result.structuredContent).toEqual({
       error: { code: "rate_limited", message: "Slow down.", retryAt: RETRY_AT },
+      meta: expect.objectContaining({ label: "delayed", source: null }),
+      notice: NOTICE,
     });
     expect(handler).not.toHaveBeenCalled();
     expect(mocks.finishCall).not.toHaveBeenCalled();
@@ -130,6 +132,8 @@ describe("defineTool", () => {
     const SECRET_TEXT = "database password is hunter2";
     const GENERIC_ERROR = {
       error: { code: "not_available", message: "Temporarily unavailable.", retryAt: null },
+      meta: expect.objectContaining({ label: "delayed", source: null }),
+      notice: NOTICE,
     };
 
     beforeEach(() => {

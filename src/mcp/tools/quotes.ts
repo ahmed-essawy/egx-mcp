@@ -142,7 +142,7 @@ export function registerQuoteTools(server: McpServer, env: Env, auth: AuthProps)
           getSnapshot(ctx.env),
           loadMarketClock(ctx.env.DB, ctx.now, ctx.rows),
         ]);
-        if (directory === null) return fail("not_available", DIRECTORY_MISSING_MESSAGE);
+        if (directory === null) return fail("not_available", DIRECTORY_MISSING_MESSAGE, { source: snapshot?.sources.stocks });
         const served = symbols.map((input) => serveInput(input, directory, snapshot, clock));
         const quotes = served.flatMap(({ quote }) => (quote ? [quote] : []));
         return ok({ quotes: served.map(({ item }) => item) }, metaFor(quotes, snapshot, clock));

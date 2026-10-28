@@ -3,7 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { DirectorySymbol, QuoteEntry, SymbolStatus } from "../../src/store/kv";
 import { clearState, restoreBindings } from "../helpers/bindings";
 import { callTool, errorCodeOf, payloadOf as structuredPayloadOf, postMcp, type ToolResult } from "../helpers/mcp";
-import { seedKey, seedSnapshot, seedSymbols, seedUser, setNow, stockSymbol, syntheticIsin, syntheticTicker } from "../helpers/seed";
+import { DIRECTORY_KEY, seedKey, seedSnapshot, seedSymbols, seedUser, setNow, stockSymbol, syntheticIsin, syntheticTicker } from "../helpers/seed";
 import { MS_PER_SECOND } from "../helpers/time";
 
 const GIVEN_NOW = Date.UTC(2026, 9, 25, 12, 0, 0) / MS_PER_SECOND;
@@ -190,6 +190,29 @@ describe("get_quotes contract", () => {
 
       expect(result.isError).toBe(true);
       expect(errorCodeOf(result)).toBe("invalid_input");
+    });
+
+    it("carries the delayed meta and the notice on the error like a success", async () => {
+      const symbols = Array.from({ length: OVER_SYMBOLS }, () => COMI_TICKER);
+
+      const result = await getQuotes(key, symbols);
+
+      expect(result.structuredContent).toMatchObject({
+        meta: { label: "delayed", source: null, stale: false },
+        notice: "Delayed, unofficial data for information only. Not investment advice.",
+      });
+    });
+  });
+
+  describe("a missing directory", () => {
+    it("fails with not_available and names the snapshot source", async () => {
+      await env.DATA.delete(DIRECTORY_KEY);
+      await seedSnapshot();
+
+      const result = await getQuotes(key, [COMI_TICKER]);
+
+      expect(errorCodeOf(result)).toBe("not_available");
+      expect(result.structuredContent).toMatchObject({ meta: { label: "delayed", source: SOURCE }, notice: expect.any(String) });
     });
   });
 

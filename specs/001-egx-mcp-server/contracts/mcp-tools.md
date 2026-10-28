@@ -22,7 +22,7 @@ Symbol inputs (`symbol`, `symbols[]`) accept a ticker, ISIN, Arabic or English n
 }
 ```
 
-Rules: `meta` is present on every market data response (FR-007, SC-002). Per-item `source`, `dataTime`, `stale` appear inside `data` items when items differ. A listed symbol with no data returns the item with `status: "no_data_yet"` (FR-009). Stock stale: trade date older than the last completed session before today (FR-008). Errors use MCP tool errors (`isError: true`) with `{ "error": { "code": "...", "message": "...", "retryAt": "ISO or null" } }`. Codes: `unauthorized`, `rate_limited`, `capacity`, `not_found`, `ambiguous`, `invalid_input`, `not_available`, `forbidden`.
+Rules: `meta` is present on every market data response (FR-007, SC-002). Per-item `source`, `dataTime`, `stale` appear inside `data` items when items differ. A listed symbol with no data returns the item with `status: "no_data_yet"` (FR-009). Stock stale: trade date older than the last completed session before today (FR-008). Errors use MCP tool errors (`isError: true`) with `{ "error": { "code": "...", "message": "...", "retryAt": "ISO or null" }, "meta": {...}, "notice": "..." }`. The error carries the same `meta` shape and the same `notice` as a success: `label` `delayed`, `source` set when the snapshot source is known (otherwise `null`), `dataTime` and `session` `null`, `stale` false and an empty `notAvailable`. Codes: `unauthorized`, `rate_limited`, `capacity`, `not_found`, `ambiguous`, `invalid_input`, `not_available`, `forbidden`.
 
 ## Market data tools (read only)
 

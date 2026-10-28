@@ -39,11 +39,21 @@ export function ok<T>(data: T, meta: Meta): CallToolResult {
   return toResult({ data, meta, notice: NOTICE }, false);
 }
 
-export function fail(
-  code: ErrorCode,
-  message: string,
-  retryAt?: string,
-  extra?: object,
-): CallToolResult {
-  return toResult({ error: { ...extra, code, message, retryAt: retryAt ?? null } }, true);
+export type FailOptions = { retryAt?: string; extra?: object; source?: string | null };
+
+function errorMeta(source: string | null): Meta {
+  return {
+    label: "delayed",
+    dataTime: null,
+    source,
+    stale: false,
+    staleReason: null,
+    session: null,
+    notAvailable: [],
+  };
+}
+
+export function fail(code: ErrorCode, message: string, { retryAt, extra, source = null }: FailOptions = {}): CallToolResult {
+  const error = { ...extra, code, message, retryAt: retryAt ?? null };
+  return toResult({ error, meta: errorMeta(source), notice: NOTICE }, true);
 }

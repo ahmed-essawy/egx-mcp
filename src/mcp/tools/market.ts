@@ -220,7 +220,7 @@ function registerOverview(server: McpServer, env: Env, auth: AuthProps): void {
           getSnapshot(ctx.env),
           loadMarketClock(ctx.env.DB, ctx.now, ctx.rows),
         ]);
-        if (directory === null) return fail("not_available", DIRECTORY_MISSING_MESSAGE);
+        if (directory === null) return fail("not_available", DIRECTORY_MISSING_MESSAGE, { source: snapshot?.sources.stocks });
         if (snapshot === null) return fail("not_available", SNAPSHOT_MISSING_MESSAGE);
         const symbols = symbolsByIsin(directory);
         const session = sessionMeta(clock, snapshot);
@@ -279,7 +279,7 @@ function registerDailySummary(server: McpServer, env: Env, auth: AuthProps): voi
       readOnly: true,
       handler: async (_args, ctx) => {
         const [directory, snapshot] = await Promise.all([getDirectory(ctx.env), getLastSessionSnapshot(ctx.env)]);
-        if (directory === null) return fail("not_available", DIRECTORY_MISSING_MESSAGE);
+        if (directory === null) return fail("not_available", DIRECTORY_MISSING_MESSAGE, { source: snapshot?.sources.stocks });
         if (snapshot === null) return fail("not_available", LAST_SESSION_MISSING_MESSAGE);
         const symbols = symbolsByIsin(directory);
         return ok(

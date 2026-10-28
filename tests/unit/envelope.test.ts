@@ -46,18 +46,44 @@ describe("ok", () => {
   });
 });
 
+const ERROR_META: Meta = {
+  label: "delayed",
+  dataTime: null,
+  source: null,
+  stale: false,
+  staleReason: null,
+  session: null,
+  notAvailable: [],
+};
+
 describe("fail", () => {
   it("produces an error result with code, message and retryAt", () => {
-    const result = fail("rate_limited", "Too many requests", RETRY_AT);
+    const result = fail("rate_limited", "Too many requests", { retryAt: RETRY_AT });
 
     expect(result.isError).toBe(true);
-    expect(result.structuredContent).toEqual({
+    expect(result.structuredContent).toMatchObject({
       error: { code: "rate_limited", message: "Too many requests", retryAt: RETRY_AT },
     });
   });
 
+  it("carries the delayed label, an empty meta and the notice like a success", () => {
+    const result = fail("invalid_input", "bad");
+
+    expect(result.structuredContent).toEqual({
+      error: { code: "invalid_input", message: "bad", retryAt: null },
+      meta: ERROR_META,
+      notice: EXPECTED_NOTICE,
+    });
+  });
+
+  it("names the source when it is known", () => {
+    const result = fail("not_available", "directory missing", { source: "tradingview" });
+
+    expect(result.structuredContent).toMatchObject({ meta: { ...ERROR_META, source: "tradingview" } });
+  });
+
   it("carries the same JSON in structuredContent and the single text item", () => {
-    const result = fail("rate_limited", "Too many requests", RETRY_AT);
+    const result = fail("rate_limited", "Too many requests", { retryAt: RETRY_AT });
 
     expect(parseSingleText(result.content)).toEqual(result.structuredContent);
   });
@@ -67,20 +93,18 @@ describe("fail defaults and extra fields", () => {
   it("sets retryAt to null when omitted", () => {
     const result = fail("not_found", "No such symbol");
 
-    expect(result.structuredContent).toEqual({
+    expect(result.structuredContent).toMatchObject({
       error: { code: "not_found", message: "No such symbol", retryAt: null },
     });
   });
 
   it("never lets extra replace code, message or retryAt", () => {
-    const result = fail("not_found", "No such symbol", RETRY_AT, {
-      code: "forbidden",
-      message: "other",
-      retryAt: "x",
-      hint: "try search",
+    const result = fail("not_found", "No such symbol", {
+      retryAt: RETRY_AT,
+      extra: { code: "forbidden", message: "other", retryAt: "x", hint: "try search" },
     });
 
-    expect(result.structuredContent).toEqual({
+    expect(result.structuredContent).toMatchObject({
       error: { code: "not_found", message: "No such symbol", retryAt: RETRY_AT, hint: "try search" },
     });
   });
