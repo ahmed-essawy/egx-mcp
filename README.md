@@ -1,10 +1,10 @@
 # EGX MCP Server
 
-An MCP (Model Context Protocol) server that gives AI assistants read access to Egyptian Exchange (EGX) market data: stock quotes and indices today, with price history, funds, dividends, financial figures, gold, silver and the dollar rate coming later. It runs as one Cloudflare Worker on the free tier. Anyone with a Google account can sign in, create an API key and use it from Claude (custom connector), Claude Code, ChatGPT or Cursor.
+An MCP (Model Context Protocol) server that gives AI assistants read access to Egyptian Exchange (EGX) market data: stock quotes, indices, gold, silver and the dollar rate today, with price history, funds, dividends and financial figures coming later. It runs as one Cloudflare Worker on the free tier. Anyone with a Google account can sign in, create an API key and use it from Claude (custom connector), Claude Code, ChatGPT or Cursor.
 
 Status: the MVP runs at <https://egx-mcp.essawy.workers.dev/> (see also the [privacy policy](https://egx-mcp.essawy.workers.dev/privacy) and the [terms of use](https://egx-mcp.essawy.workers.dev/terms)), and no permission from EGX or EGID to share the data has been obtained yet. See [Data sources and limits](#data-sources-and-limits).
 
-Current build (MVP): only 5 tools are enabled (`search`, `get_quotes`, `get_market_overview`, `get_indices` and `get_daily_summary`). Sign-in with Google from Claude and ChatGPT is not available yet (coming later), so connect with an API key from the dashboard. The `admin` tool, portfolio, price levels, funds, metals and the other tools are not built yet, so the owner tasks, the holiday table and the notices described below are planned. Parts of this guide that describe later work are marked "(coming later)".
+Current build (MVP): only 7 tools are enabled (`search`, `get_quotes`, `get_market_overview`, `get_indices`, `get_daily_summary`, `get_metals` and `get_usd_egp`). Sign-in with Google from Claude and ChatGPT is not available yet (coming later), so connect with an API key from the dashboard. The `admin` tool, portfolio, price levels, funds and the other tools are not built yet, so the owner tasks, the holiday table and the notices described below are planned. Parts of this guide that describe later work are marked "(coming later)".
 
 ## Overview
 
@@ -12,7 +12,7 @@ The server publishes its home page at <https://egx-mcp.essawy.workers.dev/>.
 
 What the server does:
 
-- Answers questions about EGX stocks and EGX indices. Mutual funds, dividends and corporate actions, company financial figures, gold and silver prices in Egypt and worldwide, and the USD/EGP rate are coming later.
+- Answers questions about EGX stocks and EGX indices. Gold and silver prices in Egypt and worldwide and the USD/EGP rate are available. Mutual funds, dividends and corporate actions, and company financial figures are coming later.
 - Keeps a personal portfolio and price levels for each signed-in user, and reports what changed since a given time (coming later).
 - Gives the owner an `admin` tool for notices, the holiday table, inflation figures and corporate action ratios (coming later).
 
@@ -21,7 +21,7 @@ Data coverage:
 - Stocks: every active EGX symbol in the server directory (ticker, ISIN, Arabic or English name all work as input), with delayed quotes during the session (end-of-day history coming later).
 - Indices: EGX30, EGX30CAPPED, EGX70EWI and EGX100EWI. EGX30USD is reported as not available unless a source supplies it.
 - Funds (coming later): Egyptian funds listed by Mubasher, with daily NAV history that grows from the day the server starts collecting.
-- Metals and currency (coming later): Egypt gold (18K, 21K, 24K) and silver (925, 999) buy and sell prices per gram, global gold and silver in USD per ounce, and the USD/EGP market rate.
+- Metals and currency: Egypt gold (18K, 21K, 24K) and silver (925, 999) buy and sell prices per gram, global gold and silver in USD per ounce, and the USD/EGP market rate.
 
 Important notice:
 
@@ -34,9 +34,9 @@ Important notice:
 | Source | What it provides |
 |---|---|
 | EGX website (www.egx.com.eg) | Intended first choice for stock quotes. Not reachable from the owner's desktop during research (every connection was reset), so it is used only if a probe from the deployed Worker succeeds. |
-| TradingView scanner | Delayed stock quotes (15 minutes), ISIN, index values and the share counts used by the symbol directory sync (dividends, financial figures, USD/EGP and global gold and silver are coming later). |
+| TradingView scanner | Delayed stock quotes (15 minutes), ISIN, index values and the share counts used by the symbol directory sync (dividends and financial figures are coming later). It also supplies the USD/EGP market rate and global gold and silver in USD per ounce. |
 | Mubasher | Backup stock quotes, listing master, Arabic names and sector (funds and NAVs, corporate action events and the history files are coming later). The end-of-day symbol directory sync needs both TradingView and Mubasher: if either fails, the directory is not updated. |
-| iSagha | Coming later: Egypt gold and silver buy and sell prices per gram. The page has no timestamp, so the data time is the fetch time. |
+| iSagha | Egypt gold and silver buy and sell prices per gram. The page has no timestamp, so the data time is the fetch time. |
 | Owner-entered | Coming later: monthly inflation (CAPMAS urban CPI) and bonus, split and reverse split ratios, entered with the `admin` tool. |
 
 The order of stock sources is the `STOCK_PROVIDERS` setting (default `egx,tradingview`). The `egx` source is not built yet (coming later) and this build ignores it. With the default setting TradingView is therefore the only stock source, with no backup and no `source_switched` notice. To have Mubasher as a backup, the owner sets `STOCK_PROVIDERS` to `tradingview,mubasher`. When several sources are set and the first fails, returns nothing or returns old data, the next one serves and the answer names the source actually used.
@@ -109,7 +109,7 @@ If a client reports `unauthorized` after you revoke a key, wait up to 2 minutes 
 
 ## Tools
 
-This build enables only `search`, `get_quotes`, `get_market_overview`, `get_indices` and `get_daily_summary`. The other tools below are planned and are not registered yet (coming later).
+This build enables only `search`, `get_quotes`, `get_market_overview`, `get_indices`, `get_daily_summary`, `get_metals` and `get_usd_egp`. The other tools below are planned and are not registered yet (coming later).
 
 Symbols can be given as a ticker, an ISIN, or an Arabic or English name. Index names accept the short aliases `EGX70` (meaning `EGX70EWI`) and `EGX100` (meaning `EGX100EWI`).
 

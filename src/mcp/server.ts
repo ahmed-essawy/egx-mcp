@@ -1,6 +1,7 @@
 import { McpServer } from "@modelcontextprotocol/server";
 import type { AuthProps } from "../auth/api-keys";
 import { registerMarketTools } from "./tools/market";
+import { registerPriceTools } from "./tools/prices";
 import { registerQuoteTools } from "./tools/quotes";
 import { registerSearchTools } from "./tools/search";
 
@@ -14,5 +15,6 @@ export function createServer(env: Env, auth: AuthProps): McpServer {
   registerSearchTools(server, env, auth);
   registerQuoteTools(server, env, auth);
   registerMarketTools(server, env, auth);
+  registerPriceTools(server, env, auth);
   return server;
 }

@@ -52,9 +52,14 @@ export interface FxProvider {
   fetchUsdEgp(): Promise<{ rate: number; tradeTime: number; kind: "market" }>;
 }
 
+export interface SpotPrice {
+  value: number;
+  tradeTime: number;
+}
+
 export interface GlobalMetalsProvider {
   id: string;
-  fetchSpot(): Promise<{ XAUUSD: number | null; XAGUSD: number | null; tradeTime: number }>;
+  fetchSpot(): Promise<{ XAUUSD: SpotPrice | null; XAGUSD: SpotPrice | null }>;
 }
 
 export interface EgyptMetalsProvider {

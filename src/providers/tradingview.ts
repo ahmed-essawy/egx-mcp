@@ -3,11 +3,14 @@ import { TRADINGVIEW_INDEX_TICKERS } from "../domain/indices";
 import { fetchJson } from "./http";
 import {
   ProviderError,
+  type FxProvider,
+  type GlobalMetalsProvider,
   type IndexProvider,
   type ListingProvider,
   type ProviderIndex,
   type ProviderListing,
   type ProviderQuote,
+  type SpotPrice,
   type StockQuoteProvider,
 } from "./types";
 import { asString, isPresent } from "./values";
@@ -16,6 +19,13 @@ const PROVIDER_ID = "tradingview";
 const SCAN_URL = "https://scanner.tradingview.com/egypt/scan";
 const INDEX_SCAN_URL = "https://scanner.tradingview.com/global/scan";
 const INDEX_COLUMNS = ["name", "close", "change", "last_bar_update_time"];
+const FX_METALS_TICKERS = ["FX_IDC:USDEGP", "TVC:GOLD", "TVC:SILVER"];
+const FX_METALS_COLUMNS = ["name", "close", "update_time"];
+const USD_EGP_NAME = "USDEGP";
+const GOLD_NAME = "GOLD";
+const SILVER_NAME = "SILVER";
+export const EMPTY_USD_EGP = "scan response has no USDEGP row";
+export const EMPTY_SPOT = "scan response has no spot metal rows";
 const SCAN_RANGE = [0, 400];
 const STOCK_TYPE = "stock";
 const LISTING_MARKET = "main";
@@ -153,5 +163,49 @@ export const tradingViewIndices: IndexProvider = {
     return scanRows(body)
       .map((values) => toIndex(values, wanted))
       .filter(isPresent);
+  },
+};
+
+async function fetchFxMetalsScan(): Promise<Map<string, SpotPrice>> {
+  const body = await fetchJson(PROVIDER_ID, INDEX_SCAN_URL, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ symbols: { tickers: FX_METALS_TICKERS }, columns: FX_METALS_COLUMNS }),
+  });
+  const points = new Map<string, SpotPrice>();
+  for (const [name, close, updateTime] of scanRows(body)) {
+    const code = asString(name);
+    const value = asNumber(close);
+    const tradeTime = asNumber(updateTime);
+    if (code !== null && value !== null && tradeTime !== null) points.set(code, { value, tradeTime });
+  }
+  return points;
+}
+
+export interface FxMetals {
+  usdEgp: Awaited<ReturnType<FxProvider["fetchUsdEgp"]>> | null;
+  spot: Awaited<ReturnType<GlobalMetalsProvider["fetchSpot"]>>;
+}
+
+export async function fetchFxMetals(): Promise<FxMetals> {
+  const points = await fetchFxMetalsScan();
+  const usdEgp = points.get(USD_EGP_NAME);
+  return {
+    usdEgp: usdEgp === undefined ? null : { rate: usdEgp.value, tradeTime: usdEgp.tradeTime, kind: "market" },
+    spot: { XAUUSD: points.get(GOLD_NAME) ?? null, XAGUSD: points.get(SILVER_NAME) ?? null },
+  };
+}
+
+export const tradingViewFxMetals: FxProvider & GlobalMetalsProvider = {
+  id: PROVIDER_ID,
+  async fetchUsdEgp() {
+    const { usdEgp } = await fetchFxMetals();
+    if (usdEgp === null) throw new ProviderError(PROVIDER_ID, "empty", EMPTY_USD_EGP);
+    return usdEgp;
+  },
+  async fetchSpot() {
+    const { spot } = await fetchFxMetals();
+    if (spot.XAUUSD === null && spot.XAGUSD === null) throw new ProviderError(PROVIDER_ID, "empty", EMPTY_SPOT);
+    return spot;
   },
 };

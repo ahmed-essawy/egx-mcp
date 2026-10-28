@@ -212,6 +212,8 @@ describe("createServer", () => {
       "get_market_overview",
       "get_indices",
       "get_daily_summary",
+      "get_metals",
+      "get_usd_egp",
     ]);
   });
 });

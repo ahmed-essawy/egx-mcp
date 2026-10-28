@@ -31,6 +31,7 @@ import {
 } from "../store/kv";
 import { errorMessage, jobFailedNotice } from "./errors";
 import { LISTING_SYNC_STEP, syncListings } from "./listing-sync";
+import { refreshMetalsFx } from "./metals-fx";
 
 const JOB = "snapshot";
 const BOOTSTRAP_JOB = "listing_bootstrap";
@@ -38,6 +39,7 @@ const STOCKS_STEP = "stocks";
 const INDICES_STEP = "indices";
 const NO_INDICES = "no indices returned";
 const TOP_SIZE = 10;
+const RETAIL_EVERY_MINUTES = 15;
 const SKIPPED_OUTSIDE_WINDOW = "skipped: outside window";
 const SKIPPED_OFF_CADENCE = "skipped: off cadence";
 const NO_MAPPED_QUOTES = "no quotes mapped to a listed symbol";
@@ -318,6 +320,10 @@ async function fetchMarket(
   return { acquired: stocks.value, fetchedIndices: indices.value };
 }
 
+function isRetailMinute(today: CairoParts): boolean {
+  return toMinutes(today.time) % RETAIL_EVERY_MINUTES === 0;
+}
+
 async function persist(env: Env, next: Snapshot, isWindowEnd: boolean): Promise<void> {
   await putSnapshotIfChanged(env, next);
   if (isWindowEnd && !next.session.noTradesToday) await putLastSessionSnapshot(env, next);
@@ -344,12 +350,18 @@ export async function snapshotJob(env: Env, now: number): Promise<string | undef
   const isWindowEnd = today.time === window.end;
   if (!isInsideWindow(today, row, window)) return SKIPPED_OUTSIDE_WINDOW;
   if (!isOnCadence(env, today, isWindowEnd)) return SKIPPED_OFF_CADENCE;
-  const { acquired, fetchedIndices } = await fetchMarket(env, directory?.tickerToIsin ?? {}, now);
+  const previous = await getSnapshot(env);
+  const [{ acquired, fetchedIndices }, metalsFx] = await Promise.all([
+    fetchMarket(env, directory?.tickerToIsin ?? {}, now),
+    refreshMetalsFx(JOB, previous ?? emptySnapshot(now), now, isRetailMinute(today)),
+  ]);
+  const { fx, metals } = metalsFx;
   if (acquired.served !== null) {
-    const previous = await getSnapshot(env);
-    const next = buildSnapshot(previous, acquired.served, acquired.failures, fetchedIndices, today, row, now);
-    await persist(env, next, isWindowEnd);
+    const built = buildSnapshot(previous, acquired.served, acquired.failures, fetchedIndices, today, row, now);
+    await persist(env, { ...built, fx, metals }, isWindowEnd);
+  } else if (previous !== null) {
+    await putSnapshotIfChanged(env, { ...previous, fx, metals });
   }
-  await raiseNotices(env.DB, collectNotices(acquired, fetchedIndices, now));
+  await raiseNotices(env.DB, [...collectNotices(acquired, fetchedIndices, now), ...metalsFx.notices]);
   return undefined;
 }
