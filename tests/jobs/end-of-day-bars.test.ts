@@ -62,9 +62,10 @@ const STORE_TABLES = [
 const TRADINGVIEW_SCAN_URL = "https://scanner.tradingview.com/egypt/scan";
 const MUBASHER_LISTED_URL = "https://www.mubasher.info/api/1/listed-companies";
 const MUBASHER_PRICES_URL = "https://www.mubasher.info/api/1/stocks/prices/all";
-const CLOSES_COLUMN_COUNT = 3;
+const CLOSES_COLUMN_COUNT = 4;
 const PRIMARY_SOURCE = "mubasher";
 const BACKUP_SOURCE = "tradingview";
+const STOCK_TYPE = "stock";
 const BONUS = "bonus";
 const SPLIT = "split";
 const ONE_FOR_ONE_BONUS_RATIO = 1;
@@ -135,7 +136,7 @@ function backupCloseRows(closes: Record<string, number>) {
     totalCount: Object.keys(closes).length,
     data: Object.entries(closes).map(([ticker, close]) => ({
       s: `EGX:${ticker}`,
-      d: [ticker, close, MARKET_TRADE_TIME],
+      d: [ticker, close, MARKET_TRADE_TIME, STOCK_TYPE],
     })),
   };
 }

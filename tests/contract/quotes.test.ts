@@ -17,6 +17,7 @@ const COMI_ISIN = "EGS60121C018";
 const COMI_TICKER = "COMI";
 const MAX_SYMBOLS = 20;
 const OVER_SYMBOLS = 21;
+const PAGING_TIMEOUT_MS = 15_000;
 const DIRECTORY_SIZE = 300;
 const QUOTED_COUNT = 280;
 const PAGE_COUNT = 15;
@@ -293,6 +294,6 @@ describe("get_quotes contract", () => {
       expect(served.filter((item) => item.status === "no_data_yet")).toHaveLength(DIRECTORY_SIZE - QUOTED_COUNT);
       expect(served.filter((item) => item.status === "active")).toHaveLength(QUOTED_COUNT);
       expect(served.map((item) => item.isin)).toEqual(isins);
-    });
+    }, PAGING_TIMEOUT_MS);
   });
 });

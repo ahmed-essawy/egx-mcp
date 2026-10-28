@@ -2,9 +2,12 @@ import { env } from "cloudflare:test";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { snapshotJob } from "../../src/jobs/snapshot";
 import type { QuoteEntry, Snapshot } from "../../src/store/kv";
+import isaghaGold from "../fixtures/isagha-gold.html?raw";
+import isaghaSilver from "../fixtures/isagha-silver.html?raw";
 import mubasherListed from "../fixtures/mubasher-listed-p1.json";
 import mubasherPrices from "../fixtures/mubasher-prices-all.json";
 import tradingViewScan from "../fixtures/tradingview-egypt-scan.json";
+import tradingViewFxMetals from "../fixtures/tradingview-fx-metals.json";
 import tradingViewGlobalScan from "../fixtures/tradingview-global-scan.json";
 import { restoreBindings, setBindings } from "../helpers/bindings";
 import {
@@ -94,6 +97,11 @@ const CARRIED_TODAY_ROW: MarketRow = {
 };
 const SESSION_QUOTE_TIME = cairoSummerEpoch(SESSION_DATE, "10:25");
 const INDEX_STEP = "indices";
+const FX_FIXTURE_RATE = 55.77;
+const GOLD_FIXTURE_SPOT = 3995.54;
+const ISAGHA_GOLD_URL = "https://market.isagha.com/prices";
+const ISAGHA_SILVER_URL = "https://market.isagha.com/prices/silver";
+const FX_TICKER = "FX_IDC:USDEGP";
 
 type MarketRow = { index: number; changePct: number; volume: number; value: number; sessionTime?: number };
 
@@ -113,11 +121,20 @@ function pricesFor(tickers: string[]) {
   return { ...mubasherPrices, prices: mubasherPrices.prices.filter((price) => tickers.includes(price.code)) };
 }
 
+function htmlResponse(html: string): Response {
+  return new Response(html, { headers: { "content-type": "text/html; charset=utf-8" } });
+}
+
 function stubFetch(upstreams: Partial<Upstreams> = {}) {
-  const stub = vi.fn(async (input: RequestInfo | URL) => {
+  const stub = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
     const url = requestUrl(input);
+    if (url === ISAGHA_GOLD_URL) return htmlResponse(isaghaGold);
+    if (url === ISAGHA_SILVER_URL) return htmlResponse(isaghaSilver);
     if (url.startsWith(TRADINGVIEW_SCAN_URL)) return (upstreams.tradingView ?? fixtureResponse(tradingViewScan))();
-    if (url.startsWith(TRADINGVIEW_INDEX_URL)) return (upstreams.indices ?? fixtureResponse(tradingViewGlobalScan))();
+    if (url.startsWith(TRADINGVIEW_INDEX_URL)) {
+      if (String(init?.body).includes(FX_TICKER)) return fixtureResponse(tradingViewFxMetals)();
+      return (upstreams.indices ?? fixtureResponse(tradingViewGlobalScan))();
+    }
     if (url.startsWith(MUBASHER_PRICES_URL)) return (upstreams.mubasher ?? fixtureResponse(mubasherPrices))();
     if (url.startsWith(MUBASHER_LISTED_URL)) {
       const page = Number(new URL(url).searchParams.get("page"));
@@ -528,7 +545,7 @@ describe("snapshotJob", () => {
   });
 
   describe("every provider empty", () => {
-    it("keeps the previous snapshot unchanged and raises job_failed for each provider", async () => {
+    it("keeps the previous market data, refreshes fx and metals, and raises job_failed for each stock provider", async () => {
       const previous = await seedSnapshot({
         quotes: { [COMI_ISIN]: quoteEntry("COMI", 100, PREVIOUS_SESSION_DATE) },
       });
@@ -540,8 +557,12 @@ describe("snapshotJob", () => {
 
       await runner.run();
 
-      expect(await readSnapshot()).toEqual(previous);
-      expect(runner.kvWrites).not.toContain(SNAPSHOT_KEY);
+      const { fx, metals, ...marketData } = await readSnapshot();
+      const { fx: _previousFx, metals: _previousMetals, ...previousMarketData } = previous;
+      expect(marketData).toEqual(previousMarketData);
+      expect(fx.USDEGP).toMatchObject({ v: FX_FIXTURE_RATE, src: TRADINGVIEW });
+      expect(metals.XAUUSD).toMatchObject({ v: GOLD_FIXTURE_SPOT, src: TRADINGVIEW });
+      expect(metals.egypt).toMatchObject({ src: "isagha", unit: "EGP/g", gold: { "21": { buy: 6255, sell: 6300 } } });
       const failures = await readNotices("job_failed");
       expect(failures.map((notice) => notice.details.source).sort()).toEqual([MUBASHER, TRADINGVIEW]);
     });

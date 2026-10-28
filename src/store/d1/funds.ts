@@ -186,8 +186,7 @@ export async function recomputeCycles(db: D1Database, fundIds: string[]): Promis
          ON nav.fund_id = fund.value
         AND nav.nav_date >= COALESCE(
               (SELECT nav_date FROM nav_records WHERE fund_id = fund.value ORDER BY nav_date DESC LIMIT 1 OFFSET ?2),
-              '')
-       ORDER BY nav.fund_id, nav.nav_date`,
+              '')`,
     )
     .bind(JSON.stringify(fundIds), CYCLE_WINDOW - 1)
     .all<NavDateRecord>();
@@ -196,7 +195,7 @@ export async function recomputeCycles(db: D1Database, fundIds: string[]): Promis
   const { value: holidays } = await holidaysBetween(db, dates[0] ?? "", dates.at(-1) ?? "");
   const cycles: { fund_id: string; cycle_days: number }[] = [];
   for (const [fundId, dates] of groupDatesByFund(results)) {
-    const cycleDays = cycleDaysOf(dates, holidays);
+    const cycleDays = cycleDaysOf(dates.sort(), holidays);
     if (cycleDays !== null) cycles.push({ fund_id: fundId, cycle_days: cycleDays });
   }
   if (cycles.length === 0) return { rowsWritten: 0 };

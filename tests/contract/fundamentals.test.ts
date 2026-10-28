@@ -589,6 +589,9 @@ describe("fundamental tools contract", () => {
     });
 
     it("does not compute the yield when a cash dividend in the last 365 days has no amount", async () => {
+      await env.DB.prepare("DELETE FROM corporate_actions WHERE isin = ?1 AND kind = 'cash_dividend' AND ex_date = ?2")
+        .bind(COMI_ISIN, PAST_EX_DATE_TWO)
+        .run();
       await seedActions([{ isin: COMI_ISIN, kind: "cash_dividend", exDate: PAST_EX_DATE_TWO, status: "recorded" }]);
 
       const { data } = financialsPayload(await callTool(FINANCIALS_TOOL, { symbol: COMI_TICKER }, key));

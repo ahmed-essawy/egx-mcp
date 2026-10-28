@@ -57,6 +57,7 @@ const PRIMARY_NAME_AR = "كايرو كابيتال لأدوات الدخل ال�
 const PRIMARY_MANAGER = "سي إف إتش لادراة الأصول";
 const PRIMARY_NAV = 1.27;
 const PRIMARY_NAV_DATE = "2026-10-21";
+const EARLIER_NAV_DATE = "2026-10-20";
 const NO_CLASSIFICATION_FUND = "mubasher:6146";
 const EXTRA_FUND_ID = 7001;
 const EXTRA_FUND = `mubasher:${EXTRA_FUND_ID}`;
@@ -403,7 +404,7 @@ describe("referenceJob funds step", () => {
     });
 
     it("marks a fund stale and raises one fund_stale notice for it", async () => {
-      await seedNavs(PRIMARY_FUND, [PRIMARY_NAV_DATE]);
+      await seedNavs(PRIMARY_FUND, [EARLIER_NAV_DATE]);
       const runner = createRunner();
       stubFetch();
       await runner.run();
@@ -416,11 +417,12 @@ describe("referenceJob funds step", () => {
     });
 
     it("returns a stale fund to active when a fresh NAV arrives", async () => {
-      await seedNavs(PRIMARY_FUND, [PRIMARY_NAV_DATE]);
+      await seedNavs(PRIMARY_FUND, [EARLIER_NAV_DATE]);
       const runner = createRunner();
       stubFetch();
       await runner.run();
       await runner.run(RUN_TIME, STALE_DAY);
+      expect((await readFund(PRIMARY_FUND))?.status).toBe("stale");
       stubFetch(firstPageOnly(fundPage({ [PRIMARY_FUND_ID]: { date: "28 أكتوبر 2026" } })));
 
       await runner.run(RUN_TIME, RECOVERY_DAY);
