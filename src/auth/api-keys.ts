@@ -43,7 +43,7 @@ export async function resolveApiKey(env: Env, bearer: string): Promise<AuthProps
   if (cached && now - cached.cachedAt < KEY_CACHE_MILLISECONDS) return cached.auth;
   cache.delete(hash);
   const found = await findActiveKeyByHash(env.DB, hash);
-  if (!found || found.deletedAt !== null) return null;
+  if (!found) return null;
   const auth: AuthProps = {
     userId: found.userId,
     email: found.email,

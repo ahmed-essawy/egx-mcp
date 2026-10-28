@@ -20,7 +20,6 @@ export type ActiveKey = {
   keyId: string;
   userId: string;
   email: string;
-  deletedAt: number | null;
 };
 
 export type NewApiKey = {
@@ -59,7 +58,6 @@ type ActiveKeyRow = {
   key_id: string;
   user_id: string;
   email: string;
-  deleted_at: number | null;
 };
 
 export const MAX_ACTIVE_KEYS = 3;
@@ -152,14 +150,14 @@ export async function revokeApiKey(
 export async function findActiveKeyByHash(db: D1Database, hash: string): Promise<ActiveKey | null> {
   const row = await db
     .prepare(
-      `SELECT k.id AS key_id, k.user_id, u.email, u.deleted_at
+      `SELECT k.id AS key_id, k.user_id, u.email
        FROM api_keys k JOIN users u ON u.id = k.user_id
-       WHERE k.key_hash = ?1 AND k.revoked_at IS NULL`,
+       WHERE k.key_hash = ?1 AND k.revoked_at IS NULL AND u.deleted_at IS NULL`,
     )
     .bind(hash)
     .first<ActiveKeyRow>();
   if (!row) return null;
-  return { keyId: row.key_id, userId: row.user_id, email: row.email, deletedAt: row.deleted_at };
+  return { keyId: row.key_id, userId: row.user_id, email: row.email };
 }
 
 export async function touchKey(db: D1Database, keyId: string, now: number): Promise<TouchResult> {
