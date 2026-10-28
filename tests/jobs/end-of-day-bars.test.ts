@@ -428,6 +428,32 @@ describe("endOfDayJob bars", () => {
       expect(await readLastRunDate(EOD_BARS_JOB)).toBe(TODAY);
     });
 
+    it("still sets job_state eod_bars when activating pending symbols fails", async () => {
+      await seedMarket();
+      await env.DB
+        .prepare(
+          `INSERT INTO symbols (isin, ticker, status, created_at, updated_at) VALUES (?1, ?2, 'pending', 1, 1)`,
+        )
+        .bind(syntheticIsin(0), syntheticTicker(0))
+        .run();
+      await env.DB
+        .prepare(
+          `CREATE TRIGGER block_activation BEFORE UPDATE OF status ON symbols
+           WHEN NEW.status = 'active' BEGIN SELECT RAISE(ABORT, 'activation blocked'); END`,
+        )
+        .run();
+      stubFetch();
+
+      try {
+        await createRunner().run();
+      } finally {
+        await env.DB.prepare("DROP TRIGGER block_activation").run();
+      }
+
+      expect(await readLastRunDate(EOD_BARS_JOB)).toBe(TODAY);
+      expect(await jobFailures(BARS_STEP)).toHaveLength(1);
+    });
+
     it("fills a quote with null open, high and low from the close and marks the source as filled", async () => {
       await seedMarket((quotes) => {
         const quote = quoteOf(quotes, 0);

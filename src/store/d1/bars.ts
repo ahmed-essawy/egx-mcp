@@ -160,6 +160,9 @@ const DEFAULT_HISTORY_LIMIT = 500;
 const LATEST_SESSION_SQL = "(SELECT last_run_date FROM job_state WHERE job = 'eod_bars')";
 const UNAPPLIED_PRICE_CHANGING_SQL =
   "a.status IN ('needs_ratio', 'recorded') AND a.kind IN ('bonus', 'split', 'reverse_split')";
+const QUEUED_CANDIDATE_SQL = `FROM corporate_actions a JOIN symbols s ON s.isin = a.isin
+  WHERE ${UNAPPLIED_PRICE_CHANGING_SQL} AND a.status = 'recorded' AND a.ex_date <= ${LATEST_SESSION_SQL}
+    AND s.backfill_state IS NOT 'loading'`;
 const HISTORY_COLUMNS =
   "session_date, open, high, low, close, volume, value, adj_open, adj_high, adj_low, adj_close, adj_factor, raw_derived, source";
 const PENDING_COLUMNS = `a.id AS action_id, a.isin, a.kind, a.ex_date, a.announced_on, a.source, a.status,
@@ -400,14 +403,20 @@ export async function readApplyCandidates(db: D1Database, query: ApplyQuery, day
           .bind(day, query.actionId)
       : db
           .prepare(
-            `SELECT ${CANDIDATE_COLUMNS} FROM corporate_actions a JOIN symbols s ON s.isin = a.isin
-             WHERE ${UNAPPLIED_PRICE_CHANGING_SQL} AND a.status = 'recorded' AND a.ex_date <= ${LATEST_SESSION_SQL}
-               AND s.backfill_state IS NOT 'loading'
-             ORDER BY a.ex_date, a.id LIMIT ?2`,
+            `SELECT ${CANDIDATE_COLUMNS} ${QUEUED_CANDIDATE_SQL} ORDER BY a.ex_date, a.id LIMIT ?2`,
           )
           .bind(day, query.limit);
   const { results } = await statement.all<ApplyCandidateRow>();
   return results.map(toApplyCandidate);
+}
+
+export async function countApplyCandidates(db: D1Database): Promise<number> {
+  const row = await db
+    .prepare(
+      `SELECT COUNT(*) AS total ${QUEUED_CANDIDATE_SQL}`,
+    )
+    .first<{ total: number }>();
+  return row?.total ?? 0;
 }
 
 async function adjustmentBatch(db: D1Database, input: AdjustmentBatchInput): Promise<AdjustmentResult> {

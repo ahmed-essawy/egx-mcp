@@ -1,4 +1,5 @@
 import { utcDay } from "../../domain/calendar";
+import type { ReadResult } from "./users";
 
 export type NoticeKind = "new_listing" | "job_failed" | "needs_ratio" | "fund_stale" | "source_switched";
 export type NoticeStatus = "open" | "done";
@@ -104,10 +105,10 @@ export async function listNotices(
   status: NoticeStatus,
   limit: number,
   cursor: NoticeCursor | null,
-): Promise<NoticePage> {
+): Promise<ReadResult<NoticePage>> {
   const pageSize = Math.min(limit, MAX_NOTICES_PAGE);
   const start = cursor ?? FIRST_PAGE_CURSOR;
-  const { results } = await db
+  const { results, meta } = await db
     .prepare(
       `SELECT id, kind, subject, details, created_at, status, done_at FROM notices
        WHERE status = ?1 AND (created_at, id) < (?2, ?3) ORDER BY created_at DESC, id DESC LIMIT ?4`,
@@ -125,7 +126,7 @@ export async function listNotices(
   }));
   const last = notices[notices.length - 1];
   const nextCursor = last && notices.length === pageSize ? { createdAt: last.createdAt, id: last.id } : null;
-  return { notices, nextCursor };
+  return { value: { notices, nextCursor }, rowsRead: meta.rows_read ?? 0 };
 }
 
 export async function markNoticesDone(db: D1Database, ids: number[], at: number): Promise<number> {
@@ -214,8 +215,8 @@ export async function listDiscrepancies(
   from: string,
   to: string,
   limit: number,
-): Promise<Discrepancy[]> {
-  const { results } = await db
+): Promise<ReadResult<Discrepancy[]>> {
+  const { results, meta } = await db
     .prepare(
       `SELECT isin, session_date, primary_source, backup_source, primary_close, backup_close, diff_pct, created_at
        FROM source_discrepancies WHERE session_date >= ?1 AND session_date <= ?2
@@ -223,7 +224,7 @@ export async function listDiscrepancies(
     )
     .bind(from, to, limit)
     .all<DiscrepancyRow>();
-  return results.map((row) => ({
+  const discrepancies = results.map((row) => ({
     isin: row.isin,
     sessionDate: row.session_date,
     primarySource: row.primary_source,
@@ -233,4 +234,16 @@ export async function listDiscrepancies(
     diffPct: row.diff_pct,
     createdAt: row.created_at,
   }));
+  return { value: discrepancies, rowsRead: meta.rows_read ?? 0 };
+}
+
+export async function purgeEvents(db: D1Database, before: number, limit: number): Promise<number> {
+  const { meta } = await db
+    .prepare(
+      `DELETE FROM market_events WHERE id IN (
+         SELECT id FROM market_events WHERE occurred_at < ?1 ORDER BY occurred_at LIMIT ?2)`,
+    )
+    .bind(before, limit)
+    .run();
+  return meta.changes;
 }

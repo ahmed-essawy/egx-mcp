@@ -4,7 +4,7 @@ import { loadConfig, type Config } from "../config";
 import { checkLimits, finishCall, RowsCounter } from "../limits/usage";
 import { nowSeconds } from "../domain/calendar";
 import type { UsageSnapshot } from "../store/d1/usage";
-import { fail, NOTICE } from "./envelope";
+import { fail, NOTICE, type Label } from "./envelope";
 import type { ToolName } from "./tool-names";
 
 const INTERNAL_ERROR_MESSAGE = "Temporarily unavailable.";
@@ -33,6 +33,7 @@ export type ToolDefinition<I extends StandardSchemaWithJSON, O extends StandardS
   inputSchema: I;
   outputSchema: O;
   readOnly: boolean;
+  label?: Label;
   handler: (args: StandardSchemaWithJSON.InferOutput<I>, ctx: ToolContext) => Promise<CallToolResult>;
 };
 
@@ -68,18 +69,18 @@ async function serveCall<I extends StandardSchemaWithJSON, O extends StandardSch
   env: Env,
   auth: AuthProps,
 ): Promise<CallToolResult> {
-  if (!tool.readOnly && !auth.scopes.includes(WRITE_SCOPE)) return fail("forbidden", WRITE_SCOPE_MESSAGE);
+  if (!tool.readOnly && !auth.scopes.includes(WRITE_SCOPE)) return fail("forbidden", WRITE_SCOPE_MESSAGE, { label: tool.label });
   const cfg = loadConfig(env);
   const rows = new RowsCounter();
   const now = nowSeconds();
   const limits = await checkLimits(env, cfg, auth, now, rows);
-  if (!limits.ok) return fail(limits.code, limits.message, { retryAt: limits.retryAt });
+  if (!limits.ok) return fail(limits.code, limits.message, { retryAt: limits.retryAt, label: tool.label });
   let result: CallToolResult;
   try {
     result = await tool.handler(args, { env, cfg, auth, rows, usage: limits.usage, now });
   } catch (error) {
     logToolFailure(tool.name, error);
-    result = fail("not_available", INTERNAL_ERROR_MESSAGE);
+    result = fail("not_available", INTERNAL_ERROR_MESSAGE, { label: tool.label });
   }
   await finishCall(env, auth, tool.name, rows, now, limits.usage);
   return result;
@@ -100,12 +101,12 @@ export function defineTool<I extends StandardSchemaWithJSON, O extends StandardS
       annotations: { readOnlyHint: tool.readOnly },
     },
     (async (args: StandardSchemaWithJSON.InferOutput<I> | InvalidInput) => {
-      if (isInvalidInput(args)) return fail("invalid_input", args[INVALID_INPUT]);
+      if (isInvalidInput(args)) return fail("invalid_input", args[INVALID_INPUT], { label: tool.label });
       try {
         return await serveCall(tool, args, env, auth);
       } catch (error) {
         logToolFailure(tool.name, error);
-        return fail("not_available", INTERNAL_ERROR_MESSAGE);
+        return fail("not_available", INTERNAL_ERROR_MESSAGE, { label: tool.label });
       }
     }) as ToolCallback<I>,
   );

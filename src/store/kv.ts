@@ -134,6 +134,7 @@ const SNAPSHOT_KEY = "snapshot:v1";
 const DIRECTORY_KEY = "directory:v1";
 const STATS_KEY = "stats:v1";
 const LAST_SESSION_KEY = "snapshot:last-session";
+const PURGE_CURSOR_KEY = "oauth:purge-cursor";
 
 const SNAPSHOT_TTL_SECONDS = 30;
 const REFERENCE_TTL_SECONDS = 300;
@@ -231,4 +232,14 @@ export function getStats(env: Env): Promise<Stats | null> {
 export async function putStats(env: Env, stats: Stats): Promise<void> {
   await env.DATA.put(STATS_KEY, JSON.stringify(stats));
   writeMemo(STATS_KEY, stats, null, REFERENCE_TTL_SECONDS);
+}
+
+export function getPurgeCursor(env: Env): Promise<string | null> {
+  return readCached<string>(env, PURGE_CURSOR_KEY, REFERENCE_TTL_SECONDS);
+}
+
+export async function putPurgeCursor(env: Env, cursor: string | null): Promise<void> {
+  if (cursor === null) await env.DATA.delete(PURGE_CURSOR_KEY);
+  else await env.DATA.put(PURGE_CURSOR_KEY, JSON.stringify(cursor));
+  writeMemo(PURGE_CURSOR_KEY, cursor, null, REFERENCE_TTL_SECONDS);
 }

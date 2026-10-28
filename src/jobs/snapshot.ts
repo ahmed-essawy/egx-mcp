@@ -61,6 +61,7 @@ type Indices = Record<string, IndexEntry>;
 type IndexFetch = { indices: Indices } | { error: string };
 type Aggregates = Pick<Snapshot, "breadth" | "totals" | "top">;
 type Fetched = { quotes: Quotes } | { error: string };
+type BootstrapResult = { directory: Directory | null; notices: NewNotice[] };
 
 function isInsideWindow(today: CairoParts, row: CalendarRow | null, window: TimeRange): boolean {
   if (!isTradingDay(today.date, row)) return false;
@@ -329,27 +330,35 @@ async function persist(env: Env, next: Snapshot, isWindowEnd: boolean): Promise<
   if (isWindowEnd && !next.session.noTradesToday) await putLastSessionSnapshot(env, next);
 }
 
-async function ensureDirectory(env: Env, today: CairoParts, now: number): Promise<Directory | null> {
+async function ensureDirectory(env: Env, today: CairoParts, now: number): Promise<BootstrapResult> {
   const directory = await getDirectory(env);
-  if (directory !== null) return directory;
-  if ((await getJobState(env.DB, BOOTSTRAP_JOB))?.lastRunDate === today.date) return null;
+  if (directory !== null) return { directory, notices: [] };
+  if ((await getJobState(env.DB, BOOTSTRAP_JOB))?.lastRunDate === today.date) return { directory: null, notices: [] };
   await markJobRun(env.DB, BOOTSTRAP_JOB, today.date);
   try {
-    return await syncListings(env, now, BOOTSTRAP_JOB);
+    const { directory: synced, notices } = await syncListings(env, now, BOOTSTRAP_JOB);
+    return { directory: synced, notices };
   } catch (error) {
-    await raiseNotices(env.DB, [jobFailedNotice(BOOTSTRAP_JOB, LISTING_SYNC_STEP, "", errorMessage(error), now)]);
-    return null;
+    return {
+      directory: null,
+      notices: [jobFailedNotice(BOOTSTRAP_JOB, LISTING_SYNC_STEP, "", errorMessage(error), now)],
+    };
   }
+}
+
+async function skipRun(env: Env, notices: NewNotice[], reason: string): Promise<string> {
+  await raiseNotices(env.DB, notices);
+  return reason;
 }
 
 export async function snapshotJob(env: Env, now: number): Promise<string | undefined> {
   const today = cairoParts(now);
-  const directory = await ensureDirectory(env, today, now);
+  const { directory, notices: bootstrapNotices } = await ensureDirectory(env, today, now);
   const row = await getCalendarRow(env.DB, today.date);
   const window = refreshWindow(row);
   const isWindowEnd = today.time === window.end;
-  if (!isInsideWindow(today, row, window)) return SKIPPED_OUTSIDE_WINDOW;
-  if (!isOnCadence(env, today, isWindowEnd)) return SKIPPED_OFF_CADENCE;
+  if (!isInsideWindow(today, row, window)) return skipRun(env, bootstrapNotices, SKIPPED_OUTSIDE_WINDOW);
+  if (!isOnCadence(env, today, isWindowEnd)) return skipRun(env, bootstrapNotices, SKIPPED_OFF_CADENCE);
   const previous = await getSnapshot(env);
   const [{ acquired, fetchedIndices }, metalsFx] = await Promise.all([
     fetchMarket(env, directory?.tickerToIsin ?? {}, now),
@@ -362,6 +371,6 @@ export async function snapshotJob(env: Env, now: number): Promise<string | undef
   } else if (previous !== null) {
     await putSnapshotIfChanged(env, { ...previous, fx, metals });
   }
-  await raiseNotices(env.DB, [...collectNotices(acquired, fetchedIndices, now), ...metalsFx.notices]);
+  await raiseNotices(env.DB, [...bootstrapNotices, ...collectNotices(acquired, fetchedIndices, now), ...metalsFx.notices]);
   return undefined;
 }

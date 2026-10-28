@@ -76,11 +76,24 @@ type SymbolProfileRecord = {
   updated_at: number;
 };
 
+export type NewListing = { isin: string; ticker: string };
+
+const MISSING_SESSIONS_LIMIT = 5;
 const ALIAS_REFRESH_SECONDS = 7 * 24 * 60 * 60;
 
-export async function upsertListings(db: D1Database, rows: ListingRow[], now: number): Promise<WriteResult> {
-  if (rows.length === 0) return { rowsWritten: 0 };
-  const records = rows.map((row) => ({
+type ListingRecord = {
+  isin: string;
+  ticker: string;
+  name_ar: string | null;
+  name_en: string | null;
+  sector: string | null;
+  status: SymbolStatus;
+  shares_outstanding: number | null;
+  free_float_shares: number | null;
+};
+
+function toListingRecords(rows: ListingRow[]): ListingRecord[] {
+  return rows.map((row) => ({
     isin: row.isin,
     ticker: row.ticker,
     name_ar: row.nameAr,
@@ -90,6 +103,32 @@ export async function upsertListings(db: D1Database, rows: ListingRow[], now: nu
     shares_outstanding: row.sharesOutstanding,
     free_float_shares: row.freeFloatShares,
   }));
+}
+
+export async function insertPendingListings(
+  db: D1Database,
+  rows: ListingRow[],
+  now: number,
+): Promise<NewListing[]> {
+  if (rows.length === 0) return [];
+  const { results } = await db
+    .prepare(
+      `INSERT INTO symbols (isin, ticker, name_ar, name_en, sector, status, shares_outstanding, free_float_shares, created_at, updated_at)
+       SELECT json_extract(value, '$.isin'), json_extract(value, '$.ticker'), json_extract(value, '$.name_ar'),
+              json_extract(value, '$.name_en'), json_extract(value, '$.sector'), 'pending',
+              json_extract(value, '$.shares_outstanding'), json_extract(value, '$.free_float_shares'), ?2, ?2
+       FROM json_each(?1) WHERE true
+       ON CONFLICT (isin) DO NOTHING
+       RETURNING isin, ticker`,
+    )
+    .bind(JSON.stringify(toListingRecords(rows)), now)
+    .all<NewListing>();
+  return results;
+}
+
+export async function upsertListings(db: D1Database, rows: ListingRow[], now: number): Promise<WriteResult> {
+  if (rows.length === 0) return { rowsWritten: 0 };
+  const records = toListingRecords(rows);
   const { meta } = await db
     .prepare(
       `INSERT INTO symbols (isin, ticker, name_ar, name_en, sector, status, shares_outstanding, free_float_shares, created_at, updated_at)
@@ -177,6 +216,38 @@ export async function setStatus(
       "UPDATE symbols SET status = ?1, updated_at = ?2 WHERE status != ?1 AND isin IN (SELECT value FROM json_each(?3))",
     )
     .bind(status, now, JSON.stringify(isins))
+    .run();
+  return { rowsWritten: meta.rows_written };
+}
+
+export async function trackListings(db: D1Database, listedIsins: string[]): Promise<void> {
+  if (listedIsins.length === 0) return;
+  const listed = JSON.stringify(listedIsins);
+  await db.batch([
+    db
+      .prepare(
+        "UPDATE symbols SET missing_sessions = missing_sessions + 1 WHERE status != 'inactive' AND isin NOT IN (SELECT value FROM json_each(?1))",
+      )
+      .bind(listed),
+    db
+      .prepare("UPDATE symbols SET status = 'inactive' WHERE missing_sessions >= ?1 AND status != 'inactive'")
+      .bind(MISSING_SESSIONS_LIMIT),
+    db
+      .prepare(
+        `UPDATE symbols SET missing_sessions = 0, status = CASE WHEN status = 'inactive' THEN 'active' ELSE status END
+         WHERE isin IN (SELECT value FROM json_each(?1)) AND (missing_sessions != 0 OR status = 'inactive')`,
+      )
+      .bind(listed),
+  ]);
+}
+
+export async function activatePending(db: D1Database, isins: string[], now: number): Promise<WriteResult> {
+  if (isins.length === 0) return { rowsWritten: 0 };
+  const { meta } = await db
+    .prepare(
+      "UPDATE symbols SET status = 'active', updated_at = ?1 WHERE status = 'pending' AND isin IN (SELECT value FROM json_each(?2))",
+    )
+    .bind(now, JSON.stringify(isins))
     .run();
   return { rowsWritten: meta.rows_written };
 }

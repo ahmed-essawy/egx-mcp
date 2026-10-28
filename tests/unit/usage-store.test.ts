@@ -93,7 +93,7 @@ describe("usage store", () => {
       await addOauthKvWrites(db, GIVEN_DAY, 2);
       await addBackfillRows(db, GIVEN_DAY, 9);
 
-      expect(await readGlobal(db, GIVEN_DAY)).toEqual({
+      expect((await readGlobal(db, GIVEN_DAY)).value).toEqual({
         calls: 0,
         rowsRead: 0,
         oauthKvWrites: 2,
@@ -104,7 +104,7 @@ describe("usage store", () => {
     });
 
     it("reads zeros for a day without a row", async () => {
-      expect(await readGlobal(db, OTHER_DAY)).toEqual({
+      expect((await readGlobal(db, OTHER_DAY)).value).toEqual({
         calls: 0,
         rowsRead: 0,
         oauthKvWrites: 0,
@@ -127,11 +127,11 @@ describe("usage store", () => {
         await recordUsage(db, { userId, day, tool, rowsRead: 0, personalRows: 0 });
       }
 
-      expect(await topUsers(db, GIVEN_DAY, 10)).toEqual([
+      expect((await topUsers(db, GIVEN_DAY, 10)).value).toEqual([
         { userId: OTHER_USER_ID, calls: 2 },
         { userId: USER_ID, calls: 1 },
       ]);
-      expect(await topUsers(db, GIVEN_DAY, 1)).toEqual([{ userId: OTHER_USER_ID, calls: 2 }]);
+      expect((await topUsers(db, GIVEN_DAY, 1)).value).toEqual([{ userId: OTHER_USER_ID, calls: 2 }]);
     });
   });
 });

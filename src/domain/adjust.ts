@@ -9,6 +9,8 @@ export type CorporateActionKind =
   | "name_change"
   | "other";
 
+export const PRICE_CHANGING_KINDS: readonly CorporateActionKind[] = ["bonus", "split", "reverse_split"];
+
 export type CorporateActionStatus = "needs_ratio" | "recorded" | "adjusting" | "applied";
 
 export interface RawCsvBar {

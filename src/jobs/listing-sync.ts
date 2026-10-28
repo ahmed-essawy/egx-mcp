@@ -2,15 +2,18 @@ import { normalizeArabic } from "../domain/arabic";
 import { mubasherListings } from "../providers/mubasher";
 import { tradingViewStocks } from "../providers/tradingview";
 import type { ListingProvider, ProviderListing } from "../providers/types";
-import { raiseNotices, type NewNotice } from "../store/d1/events";
+import { insertEvents, type NewNotice } from "../store/d1/events";
 import {
   aliasMap,
+  countSymbols,
+  insertPendingListings,
   listDirectoryRows,
   upsertAliases,
   upsertListings,
   type AliasRow,
   type DirectoryRow,
   type ListingRow,
+  type NewListing,
 } from "../store/d1/symbols";
 import { getDirectory, putDirectoryIfChanged, type Directory, type DirectorySymbol } from "../store/kv";
 import { errorMessage, jobFailedNotice } from "./errors";
@@ -95,18 +98,49 @@ async function writeDirectory(env: Env, listings: ListingRow[], now: number): Pr
   return directory;
 }
 
-export async function syncListings(env: Env, now: number, job: string): Promise<Directory | null> {
+export type ListingSync = { directory: Directory | null; notices: NewNotice[]; listedIsins: string[] | null };
+
+function newListingNotice({ isin, ticker }: NewListing, now: number): NewNotice {
+  return { kind: "new_listing", subject: isin, details: { isin, ticker, time: now }, at: now };
+}
+
+async function discoverListings(env: Env, rows: ListingRow[], now: number): Promise<NewNotice[]> {
+  if ((await countSymbols(env.DB)) === 0) return [];
+  const discovered = await insertPendingListings(env.DB, rows, now);
+  await insertEvents(
+    env.DB,
+    discovered.map(({ isin, ticker }) => ({
+      kind: "new_listing" as const,
+      occurredAt: now,
+      isin,
+      fundId: null,
+      payload: { ticker },
+    })),
+  );
+  return discovered.map((listing) => newListingNotice(listing, now));
+}
+
+function collectListedIsins(rows: ListingRow[], mubasher: ProviderListing[], directory: Directory): string[] {
+  const mapped = mubasher.flatMap((listing) => {
+    const isin = directory.tickerToIsin[listing.ticker.toUpperCase()];
+    return isin === undefined ? [] : [isin];
+  });
+  return [...new Set([...rows.map((row) => row.isin), ...mapped])];
+}
+
+export async function syncListings(env: Env, now: number, job: string): Promise<ListingSync> {
   const providers = [tradingViewStocks, mubasherListings];
   const results = await Promise.allSettled(providers.map((provider) => provider.fetchListings()));
   const failures = collectFailures(job, providers, results, now);
-  await raiseNotices(env.DB, failures);
-  if (failures.length > 0) return null;
+  if (failures.length > 0) return { directory: null, notices: failures, listedIsins: null };
   const [tradingView, mubasher] = results.map((result) =>
     result.status === "fulfilled" ? result.value : [],
   ) as Sources;
   const rows = mergeListings(tradingView, mubasher);
-  if (rows.length === 0) return null;
+  if (rows.length === 0) return { directory: null, notices: [], listedIsins: null };
+  const notices = await discoverListings(env, rows, now);
   await upsertListings(env.DB, rows, now);
   await upsertAliases(env.DB, toAliasRows(rows), now);
-  return writeDirectory(env, rows, now);
+  const directory = await writeDirectory(env, rows, now);
+  return { directory, notices, listedIsins: collectListedIsins(rows, mubasher, directory) };
 }

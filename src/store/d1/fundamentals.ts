@@ -1,4 +1,4 @@
-import type { CorporateActionKind } from "../../domain/adjust";
+import { PRICE_CHANGING_KINDS, type CorporateActionKind } from "../../domain/adjust";
 import { shiftDays } from "../../domain/returns";
 import type { ReadResult, WriteResult } from "./users";
 
@@ -411,7 +411,7 @@ export async function insertManualAction(db: D1Database, row: ManualActionRow): 
       row.ratio,
       row.amount,
       row.currency,
-      row.ratio === null ? "needs_ratio" : "recorded",
+      row.ratio === null && PRICE_CHANGING_KINDS.includes(row.kind) ? "needs_ratio" : "recorded",
       row.source,
       row.sourceText,
       row.now,

@@ -525,6 +525,23 @@ describe("oauth sign-in", () => {
       expect(tools.sort()).toEqual([CHANGES_TOOL, PORTFOLIO_TOOL, SEARCH_TOOL].sort());
     });
 
+    it("refuses the admin tool to an owner whose token is read-only, writing nothing", async () => {
+      setBindings({ OWNER_EMAILS: USER_EMAIL });
+      const { accessToken } = await signInWith(USER_EMAIL, READ_SCOPE);
+
+      const refused = await callTool(
+        "admin",
+        { action: "set_inflation", month: "2026-09", cpiIndex: 120, yoyPct: 10, source: "CAPMAS" },
+        accessToken,
+      );
+
+      expect(refused.isError).toBe(true);
+      expect(errorCodeOf(refused)).toBe("forbidden");
+      expect((refused.structuredContent as unknown as { meta: { label: string } }).meta.label).toBe("owner_entered");
+      const stored = await env.DB.prepare("SELECT COUNT(*) AS n FROM inflation_figures").first<{ n: number }>();
+      expect(stored?.n).toBe(0);
+    });
+
     it("serves the write tools when both scopes were granted", async () => {
       const { accessToken } = await signInWith(USER_EMAIL, BOTH_SCOPES);
 

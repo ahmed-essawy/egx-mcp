@@ -1,11 +1,11 @@
 import { normalizeArabic } from "../domain/arabic";
-import { cairoParts } from "../domain/calendar";
+import { cairoParts, SECONDS_PER_DAY, utcDay } from "../domain/calendar";
 import { isNavStale } from "../domain/freshness";
 import { mubasherActions, mubasherFunds } from "../providers/mubasher";
 import { tradingViewFundamentals, tradingViewFxMetals } from "../providers/tradingview";
 import type { ProviderFund } from "../providers/types";
 import { holidaysBetween } from "../store/d1/calendar";
-import { raiseNotices, type NewNotice } from "../store/d1/events";
+import { purgeEvents, raiseNotices, type NewNotice } from "../store/d1/events";
 import {
   insertNavs,
   listFundSummaries,
@@ -16,6 +16,7 @@ import {
   type FundSummary,
 } from "../store/d1/funds";
 import { getJobState, markJobRun } from "../store/d1/jobs";
+import { purgeUsageDaily } from "../store/d1/usage";
 import {
   getDirectory,
   getSnapshot,
@@ -33,6 +34,12 @@ const FUNDS_STEP = "funds";
 const METALS_FX_STEP = "metalsFx";
 const ACTIONS_STEP = "corporateActions";
 const FUNDAMENTALS_STEP = "fundamentals";
+const PURGE_STEP = "purge";
+const D1_SOURCE = "d1";
+const EVENT_RETENTION_DAYS = 400;
+const USAGE_RETENTION_DAYS = 90;
+const EVENT_PURGE_LIMIT = 1200;
+const USAGE_PURGE_LIMIT = 3000;
 
 type ReferenceContext = { env: Env; now: number; today: string };
 type ReferenceStep = { name: string; source: string; run: (context: ReferenceContext) => Promise<NewNotice[]> };
@@ -145,11 +152,18 @@ async function runMetalsFxStep({ env, now }: ReferenceContext): Promise<NewNotic
   return notices;
 }
 
+async function runPurgeStep({ env, now }: ReferenceContext): Promise<NewNotice[]> {
+  await purgeEvents(env.DB, now - EVENT_RETENTION_DAYS * SECONDS_PER_DAY, EVENT_PURGE_LIMIT);
+  await purgeUsageDaily(env.DB, utcDay(now - USAGE_RETENTION_DAYS * SECONDS_PER_DAY), USAGE_PURGE_LIMIT);
+  return [];
+}
+
 const STEPS: ReferenceStep[] = [
   { name: METALS_FX_STEP, source: tradingViewFxMetals.id, run: runMetalsFxStep },
   { name: FUNDS_STEP, source: mubasherFunds.id, run: runFundsStep },
   { name: ACTIONS_STEP, source: mubasherActions.id, run: runCorporateActionsStep },
   { name: FUNDAMENTALS_STEP, source: tradingViewFundamentals.id, run: runFundamentalsStep },
+  { name: PURGE_STEP, source: D1_SOURCE, run: runPurgeStep },
 ];
 
 async function stepNotices(step: ReferenceStep, context: ReferenceContext): Promise<NewNotice[]> {

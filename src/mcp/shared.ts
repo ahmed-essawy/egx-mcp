@@ -5,7 +5,7 @@ import { isQuoteStale } from "../domain/freshness";
 import type { RowsCounter } from "../limits/usage";
 import type { ReadResult } from "../store/d1/users";
 import { getDirectory, type Directory, type DirectorySymbol, type QuoteEntry } from "../store/kv";
-import { fail } from "./envelope";
+import { fail, type Label } from "./envelope";
 import { MAX_SYMBOL_INPUT_LENGTH, resolveSymbol, type Resolution } from "./resolve";
 import type { MarketClock } from "./session";
 
@@ -52,22 +52,27 @@ export function staleReasonOf(quotes: QuoteEntry[], clock: MarketClock): string 
   return `Data dated ${staleDates.sort()[0]} is older than the last completed session.`;
 }
 
-export function unresolvedSymbol(input: string, failure: Extract<Resolution<DirectorySymbol>, { ok: false }>) {
+export function unresolvedSymbol(
+  input: string,
+  failure: Extract<Resolution<DirectorySymbol>, { ok: false }>,
+  label?: Label,
+) {
   const candidates = failure.candidates.map(identityOf);
   if (failure.code === "ambiguous") {
-    return fail("ambiguous", `Symbol "${input}" matches several symbols.`, { extra: { input, candidates } });
+    return fail("ambiguous", `Symbol "${input}" matches several symbols.`, { extra: { input, candidates }, label });
   }
-  return fail("not_found", `Symbol "${input}" was not found.`, { extra: { input, suggestions: candidates } });
+  return fail("not_found", `Symbol "${input}" was not found.`, { extra: { input, suggestions: candidates }, label });
 }
 
 export function resolveEach(
   directory: Directory,
   inputs: string[],
+  label?: Label,
 ): { entries: DirectorySymbol[] } | { failure: CallToolResult } {
   const entries: DirectorySymbol[] = [];
   for (const input of inputs) {
     const resolution = resolveSymbol(directory, input);
-    if (!resolution.ok) return { failure: unresolvedSymbol(input, resolution) };
+    if (!resolution.ok) return { failure: unresolvedSymbol(input, resolution, label) };
     entries.push(resolution.entry);
   }
   return { entries };
@@ -79,8 +84,8 @@ export function found<T>(value: T): Found<T> {
   return { ok: true, value };
 }
 
-export async function loadDirectory(env: Env): Promise<Found<Directory>> {
+export async function loadDirectory(env: Env, label?: Label): Promise<Found<Directory>> {
   const directory = await getDirectory(env);
-  if (directory === null) return { ok: false, result: fail("not_available", DIRECTORY_MISSING_MESSAGE) };
+  if (directory === null) return { ok: false, result: fail("not_available", DIRECTORY_MISSING_MESSAGE, { label }) };
   return found(directory);
 }

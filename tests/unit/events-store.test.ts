@@ -62,18 +62,23 @@ describe("events store", () => {
   it("binds the two part cursor and returns the next cursor of a full page", async () => {
     const all = vi.fn().mockResolvedValue({
       results: [noticeRow(NEWER_NOTICE.id, NEWER_NOTICE.createdAt), noticeRow(OLDER_NOTICE.id, OLDER_NOTICE.createdAt)],
+      meta: { rows_read: PAGE_SIZE },
     });
     const { db, bind } = spyDb({ all });
     const cursor = { createdAt: NEWER_NOTICE.createdAt + 1, id: NEWER_NOTICE.id };
-    const page = await listNotices(db, OPEN, PAGE_SIZE, cursor);
+    const { value: page, rowsRead } = await listNotices(db, OPEN, PAGE_SIZE, cursor);
     expect(bind).toHaveBeenCalledWith(OPEN, cursor.createdAt, cursor.id, PAGE_SIZE);
+    expect(rowsRead).toBe(PAGE_SIZE);
     expect(page.nextCursor).toEqual({ createdAt: OLDER_NOTICE.createdAt, id: OLDER_NOTICE.id });
   });
 
   it("has no next cursor on a short page and caps the page size", async () => {
-    const all = vi.fn().mockResolvedValue({ results: [noticeRow(OLDER_NOTICE.id, OLDER_NOTICE.createdAt)] });
+    const all = vi.fn().mockResolvedValue({
+      results: [noticeRow(OLDER_NOTICE.id, OLDER_NOTICE.createdAt)],
+      meta: { rows_read: 1 },
+    });
     const { db, bind } = spyDb({ all });
-    const page = await listNotices(db, OPEN, OVER_MAX_PAGE_SIZE, null);
+    const { value: page } = await listNotices(db, OPEN, OVER_MAX_PAGE_SIZE, null);
     expect(bind.mock.calls[0]?.[3]).toBe(MAX_NOTICES_PAGE);
     expect(page.nextCursor).toBeNull();
   });

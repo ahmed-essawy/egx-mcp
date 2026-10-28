@@ -14,7 +14,7 @@ const ACCOUNT_DELETED_MESSAGE = "This account has been deleted and cannot sign i
 export type SignInResult = { kind: "capacity" } | { kind: "deleted" } | { kind: "ok"; id: string };
 
 export async function hasCapacity(env: Env, cfg: Config, now: number, worstCaseRows: number): Promise<boolean> {
-  return checkPersonalWrite(await readGlobal(env.DB, utcDay(now)), cfg, worstCaseRows);
+  return checkPersonalWrite((await readGlobal(env.DB, utcDay(now))).value, cfg, worstCaseRows);
 }
 
 export async function recordPersonalRows(env: Env, now: number, rowsWritten: number): Promise<void> {

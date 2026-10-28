@@ -54,10 +54,13 @@ function fakeDb(rowFor: (sql: string) => Row, options: FakeDbOptions = {}): D1Da
     prepare: (sql: string) => ({
       bind: () => ({
         first: async () => rowFor(sql),
-        all: async () =>
-          sql.includes("INSERT INTO users")
-            ? { results: [{ id: USER_ID, deleted_at: upsertDeletedAt }], meta: { rows_written: UPSERT_ROWS_WRITTEN } }
-            : { results: [], meta: { rows_written: 0 } },
+        all: async () => {
+          if (sql.includes("INSERT INTO users")) {
+            return { results: [{ id: USER_ID, deleted_at: upsertDeletedAt }], meta: { rows_written: UPSERT_ROWS_WRITTEN } };
+          }
+          if (sql.includes("FROM usage_global")) return { results: [rowFor(sql)], meta: { rows_read: 1 } };
+          return { results: [], meta: { rows_written: 0 } };
+        },
         run: async () => {
           run(sql);
           return { meta: { rows_written: 1, changes } };

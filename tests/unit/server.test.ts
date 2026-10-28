@@ -280,6 +280,7 @@ describe("createServer", () => {
       "get_dividends",
       "get_corporate_actions",
       "get_financials",
+      "admin",
     ]);
   });
 });

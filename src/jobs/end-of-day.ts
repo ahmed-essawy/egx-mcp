@@ -20,6 +20,7 @@ import {
 import { getCalendarRow } from "../store/d1/calendar";
 import { insertDiscrepancies, insertEvents, raiseNotices, type Discrepancy, type NewNotice } from "../store/d1/events";
 import { getJobState, markJobOk, markJobRun } from "../store/d1/jobs";
+import { activatePending, trackListings } from "../store/d1/symbols";
 import {
   getDirectory,
   getSnapshot,
@@ -55,6 +56,7 @@ type RunContext = {
   snapshot: Snapshot | null;
   directory: Directory | null;
   quotes: SessionQuote[];
+  listedIsins: string[] | null;
 };
 type Step = { name: string; source: string; run: () => Promise<void> };
 
@@ -126,10 +128,16 @@ function findDiscrepancies(
   });
 }
 
-async function writeBars({ env, quotes, date }: RunContext): Promise<void> {
+async function writeBars({ env, quotes, date, now }: RunContext): Promise<void> {
   if (quotes.length === 0) throw new Error("no quotes for the session date");
   await insertBars(env.DB, quotes.map((entry) => toBar(entry, date)));
   await setLatestSession(env.DB, date);
+  await activatePending(env.DB, quotes.map(({ isin }) => isin), now);
+}
+
+async function writeListingTracking({ env, listedIsins }: RunContext): Promise<void> {
+  if (listedIsins === null) return;
+  await trackListings(env.DB, listedIsins);
 }
 
 async function writeIndexValues({ env, snapshot, quotes, date }: RunContext): Promise<void> {
@@ -230,6 +238,7 @@ function buildSteps(context: RunContext): Step[] {
     { name: "applyQueued", source: STORE_SOURCE, run: () => applyQueued(context) },
     { name: "stats", source: STORE_SOURCE, run: () => writeStats(context) },
     { name: "lastSession", source: SNAPSHOT_SOURCE, run: () => writeLastSession(context) },
+    { name: "trackListings", source: STORE_SOURCE, run: () => writeListingTracking(context) },
   ];
 }
 
@@ -251,7 +260,8 @@ export async function endOfDayJob(env: Env, now: number): Promise<string | undef
   await markJobRun(env.DB, JOB, today.date);
   const snapshot = await getSnapshot(env);
   if (hasNoSession(snapshot, today.date)) return SKIPPED_NO_SESSION;
-  const directory = (await syncListings(env, now, JOB)) ?? (await getDirectory(env));
+  const listing = await syncListings(env, now, JOB);
+  const directory = listing.directory ?? (await getDirectory(env));
   const context: RunContext = {
     env,
     now,
@@ -260,8 +270,9 @@ export async function endOfDayJob(env: Env, now: number): Promise<string | undef
     snapshot,
     directory,
     quotes: sessionQuotes(snapshot, today.date),
+    listedIsins: listing.listedIsins,
   };
-  await raiseNotices(env.DB, await runSteps(context));
+  await raiseNotices(env.DB, [...listing.notices, ...(await runSteps(context))]);
   await markJobOk(env.DB, JOB, now);
   return undefined;
 }

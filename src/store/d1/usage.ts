@@ -1,4 +1,4 @@
-import { rowsWrittenOf, type WriteResult } from "./users";
+import { rowsWrittenOf, type ReadResult, type WriteResult } from "./users";
 
 export type UsageSnapshot = {
   globalCalls: number;
@@ -131,12 +131,13 @@ export function addBackfillRows(db: D1Database, day: string, n: number): Promise
   return addGlobalCounter(db, "backfill_rows", day, n);
 }
 
-export async function readGlobal(db: D1Database, day: string): Promise<GlobalUsage> {
-  const row = await db
+export async function readGlobal(db: D1Database, day: string): Promise<ReadResult<GlobalUsage>> {
+  const { results, meta } = await db
     .prepare(`SELECT ${GLOBAL_COLUMNS} FROM usage_global WHERE day = ?1`)
     .bind(day)
-    .first<GlobalUsageRow>();
-  return {
+    .all<GlobalUsageRow>();
+  const row = results[0];
+  const usage = {
     calls: row?.calls ?? 0,
     rowsRead: row?.rows_read ?? 0,
     oauthKvWrites: row?.oauth_kv_writes ?? 0,
@@ -144,6 +145,7 @@ export async function readGlobal(db: D1Database, day: string): Promise<GlobalUsa
     adjustRows: row?.adjust_rows ?? 0,
     personalRows: row?.personal_rows ?? 0,
   };
+  return { value: usage, rowsRead: meta.rows_read ?? 0 };
 }
 
 export async function readToolUsage(db: D1Database, userId: string, day: string): Promise<ToolUsage[]> {
@@ -154,13 +156,25 @@ export async function readToolUsage(db: D1Database, userId: string, day: string)
   return results;
 }
 
-export async function topUsers(db: D1Database, day: string, limit: number): Promise<TopUser[]> {
-  const { results } = await db
+export async function topUsers(db: D1Database, day: string, limit: number): Promise<ReadResult<TopUser[]>> {
+  const { results, meta } = await db
     .prepare(
       `SELECT user_id, SUM(calls) AS calls FROM usage_daily WHERE day = ?1
        GROUP BY user_id ORDER BY calls DESC, user_id LIMIT ?2`,
     )
     .bind(day, limit)
     .all<{ user_id: string; calls: number }>();
-  return results.map((row) => ({ userId: row.user_id, calls: row.calls }));
+  const users = results.map((row) => ({ userId: row.user_id, calls: row.calls }));
+  return { value: users, rowsRead: meta.rows_read ?? 0 };
+}
+
+export async function purgeUsageDaily(db: D1Database, beforeDay: string, limit: number): Promise<number> {
+  const { meta } = await db
+    .prepare(
+      `DELETE FROM usage_daily WHERE (day, user_id, tool) IN (
+         SELECT day, user_id, tool FROM usage_daily WHERE day < ?1 ORDER BY day LIMIT ?2)`,
+    )
+    .bind(beforeDay, limit)
+    .run();
+  return meta.changes;
 }
