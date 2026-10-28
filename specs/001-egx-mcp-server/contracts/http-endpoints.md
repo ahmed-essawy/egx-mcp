@@ -1,20 +1,20 @@
 # Contract: HTTP endpoints
 
-One Worker. `export default new OAuthProvider({...})` from `@cloudflare/workers-oauth-provider` 1.2.4, wrapped by an outer `fetch` that applies the OAuth KV write guard, plus a `scheduled` handler.
+One Worker. `export default { fetch, scheduled }` in `src/index.ts`: `fetch` first applies the OAuth KV write guard (guarded routes only), then delegates to an `OAuthProvider` from `@cloudflare/workers-oauth-provider` 1.2.4 built lazily per origin by `providerFor(request, env)` (the resource URL depends on `PUBLIC_ORIGIN`); `scheduled` dispatches the crons.
 
 ## OAuth and MCP (library-owned unless stated)
 
 | Method and path | Owner | Behavior |
 |---|---|---|
 | `GET /.well-known/oauth-authorization-server`, `GET /.well-known/oauth-protected-resource` | library | Metadata for MCP clients |
-| `POST /register` | library (DCR) | Guarded: refused with `503` and `Retry-After` (seconds to 00:00 UTC) when `usage_global.oauth_kv_writes + 1 > OAUTH_DAILY_KV_WRITES` |
-| `GET /authorize` | app | Parses the request with `OAUTH_PROVIDER.parseAuthRequest`; if consent is remembered, continues; else renders the consent page (client name, scopes, "data is delayed and informational") |
-| `POST /authorize` | app | Consent form (CSRF token from the library consent helper); on approve calls `beginUpstream` to Google with `openid email profile` |
-| `GET /callback/google` | app | `finishUpstream`, verifies the Google ID token (`iss`, `aud`, `exp`, `email_verified`), upserts `users`, then `completeAuthorization({ userId, props: { userId, email } })`. Guarded (+1 KV write) |
+| `POST /register` | library (DCR) | Guarded (+1 KV write): refused with `503` and `Retry-After` (seconds to 00:00 UTC) when `usage_global.oauth_kv_writes` plus the route cost would pass `OAUTH_DAILY_KV_WRITES` |
+| `GET /authorize` | app | Parses the request with `OAUTH_PROVIDER.parseAuthRequest`, looks up the client and calls `beginConsent`; renders the consent page every time (no remembered consent, owner decision D4): client name, requested scopes, "data is delayed and informational", Approve and Deny buttons. Guarded (+1 KV write, the consent transaction) |
+| `POST /authorize` | app | Consent form posting the library `handle` (bound by the library's own consent cookie, not by `checkPost`) and `decision` (`approve` or `deny`); approve calls `approveConsent` then `beginUpstream` to Google with `openid email profile`; deny calls `denyConsent`. Guarded (+1 KV write, the upstream transaction) |
+| `GET /callback/google` | app | `finishUpstream`, verifies the Google ID token (`iss`, `aud`, `exp`, `email_verified`), upserts `users`, then `completeAuthorization` with `userId`, the granted `scope` and `props: { userId, email, via: "oauth" }`. Guarded (+1 KV write, the grant) |
 | `POST /token` | library | Guarded (+2 KV writes). `accessTokenTTL` 86,400 s |
 | `POST /mcp` | app (`createMcpHandler`) | MCP Streamable HTTP, stateless. Bearer is an OAuth token or an API key (`egx_` prefix, resolved by `resolveExternalToken`). `401` with `WWW-Authenticate` when missing or invalid |
 
-Scopes: `mcp:read` (all read tools), `mcp:write` (personal writes). Both are granted at consent; API keys carry both.
+Scopes: `mcp:read` (every tool registered `readOnly: true`, including `portfolio_get` and `what_changed_since`, whose crossing state write is internal bookkeeping), `mcp:write` (the 4 personal write tools and `admin`). Consent grants the scopes the client requested within `scopesSupported`, or both when it requested none; a call without the needed scope gets `forbidden` before any accounting row is written. API keys carry both.
 
 ## Dashboard (app-owned)
 
@@ -43,6 +43,6 @@ All HTML responses carry `Content-Security-Policy: default-src 'self'; frame-anc
 | `* 6-12 * * SUN-THU` | `snapshotJob` | Before the gate, on any tick including holidays: when `directory:v1` is missing, run the shared listing sync once per Cairo date (job `listing_bootstrap`, marked before it runs, failures raise a `job_failed` notice and never stop the snapshot). Gate: Cairo time inside the session window (09:55 to 14:45 inclusive, or special hours) on a trading day that is not a holiday; fetch stocks (provider order), indices, FX and global metals, iSagha every 15 minutes; build snapshot; write KV only if changed; at the window end also write `snapshot:last-session` |
 | `30 12,13 * * SUN-THU` | `endOfDayJob` | Runs once per Cairo date at or after 15:30 Cairo on trading days only. Its first check reads `snapshot:v1`: when `session.date` is today and `session.noTradesToday` is true, the whole job is skipped (no source fetch, no listing sync, no `missing_sessions` change, no bars, no stats) and only the run date is recorded. Otherwise, in order: discovery (`listingSync` step: listing diff, pending inserts, inactive marking, directory to KV), daily bars (then the latest stored session `L`), index values, discrepancies, big-move events, queued adjustments (at most 2 per run, within the daily row cap), stats to KV, `snapshot:last-session` if the snapshot job missed it |
 | `0 16 * * *` | `referenceJob` | Once per day, every day (funds, metals and FX do not follow the EGX calendar): funds and NAVs (at most 13 pages), corporate actions (first 3 pages), dividends and financial figures from TradingView, fund staleness notices, metals and FX merged into `snapshot:v1`, then the `purge` step: up to 1,200 `market_events` rows older than 400 days and up to 3,000 `usage_daily` rows older than 90 days |
-| `0 1 * * SAT` | `maintenanceJob` | `purgeExpiredData()` batch of at most 500 OAuth records (KV only; the D1 purges run daily in `referenceJob`) |
+| `0 1 * * SAT` | `maintenanceJob` | `purgeExpiredData({ batchSize: 250, cursor })` through `getOAuthApi(oauthOptions(origin), env)` (the `env.OAUTH_PROVIDER` helpers are not set in `scheduled`), so one run checks at most 500 OAuth records; cursor in KV `oauth:purge-cursor`; skipped with a log line when `PUBLIC_ORIGIN` is empty; writes only `job_state` job `maintenance` in D1 (the D1 purges run daily in `referenceJob`) |
 
 Every job catches per-provider failures, keeps the last stored data and writes one `job_failed` notice per job, step, source and day (failed pages listed in its details); each job writes all its notices with one `raiseNotices` statement per run.

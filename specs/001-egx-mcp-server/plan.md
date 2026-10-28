@@ -16,7 +16,7 @@ A public, stateless MCP server on Cloudflare Workers Free that answers questions
 
 **Storage**: Cloudflare D1 (one database `egx`), KV namespace `DATA` (`snapshot:v1`, `directory:v1`, `stats:v1`), KV namespace `OAUTH_KV` (library-owned)
 
-**Testing**: Vitest in the Workers pool: unit (domain), contract (each MCP tool through `SELF.fetch("/mcp")`), jobs (holiday, empty source, partial failure), integration (OAuth, keys, two-user isolation)
+**Testing**: Vitest in the Workers pool: unit (domain), contract (each MCP tool through `SELF.fetch("/mcp")`), jobs (holiday, empty source, partial failure), integration (OAuth, keys, two-user isolation). The test runtime pins the Miniflare compatibility date to 2026-08-22, the newest date the `workerd` bundled with `@cloudflare/vitest-pool-workers` 0.23.0 supports; production keeps 2026-10-01 (owner decision D4, T127)
 
 **Target Platform**: Cloudflare Workers Free plan, compatibility date 2026-10-01, flag `nodejs_compat`
 
@@ -46,7 +46,7 @@ At the default global cap of 15,000 tool calls per day: KV writes at most 897 of
 | IV. Zero cost | Free tiers only, no payment method, refusal over billing, jobs sized to free tiers | PASS | PASS: budget table; global caps for calls, rows read, OAuth KV writes and personal D1 writes; the D1 rows-written total is hard: every writer has a cap or a worst-case reserve, `loadConfig` refuses caps whose reserves pass 100,000, and the backfill allowance is computed before each file from today's live counters and the deployed caps (at most 36,000 at defaults, 97,000 total); adjustment recompute capped at 10,000 rows per day inside each batch's transaction and 2 actions per end-of-day run; notices cost one statement per run (at most 40 D1 statements per end-of-day run); daily purges keep `market_events` within 400 days and need no purge for the K2 table; asserted by T122. Open items that touch IV: C23, C29, C31, and the `usage_daily` purge keeps 90 days only while new rows average at most 3,000 per day (research R1 Purges) |
 | V. Secure multi-user access | OAuth via `workers-oauth-provider` with Google; keys from dashboard, shown once, SHA-256 + prefix + last used, revocable, max 3; per-user limits; usage recorded; no secrets in code or logs | PASS | PASS: [http-endpoints.md](contracts/http-endpoints.md); secrets (`GOOGLE_CLIENT_SECRET`, `SESSION_SECRET`) via `wrangler secret`, the public Google client id as the `GOOGLE_CLIENT_ID` var in `wrangler.jsonc` with `keep_vars: true` so dashboard variables survive a deploy; logs carry user id and tool name only |
 | VI. Informational only | Facts only; no recommendations; no ticks; no push | PASS | PASS: `notice` field; notices are pull-only through `admin` |
-| Platform: data sources | EGX primary while usable, TradingView backup; else TradingView primary and Mubasher backup; every stock value keeps a primary and a backup | PASS | PASS: `STOCK_PROVIDERS` default `egx,tradingview`, switched to `tradingview,mubasher` by the probe task when EGX fails |
+| Platform: data sources | EGX primary while usable, TradingView backup; else TradingView primary and Mubasher backup; every stock value keeps a primary and a backup | PASS | PASS: `STOCK_PROVIDERS` is `tradingview,mubasher` (owner decision D1, 2026-10-28, T128) because the `egx` provider is not built and an ignored `egx` entry left TradingView with no backup; the probe (T006, T007) and the EGX parser addendum decide later where `egx` goes |
 | Platform: provider abstraction | Each source replaceable without changing tool I/O | PASS | PASS: `src/providers/types.ts` interfaces; tools never import a provider |
 | Platform: Yahoo not used | | PASS | PASS |
 | Workflow: tests per tool and per job case | | PASS | PASS: `tests/contract/*`, `tests/jobs/*` |
@@ -114,7 +114,7 @@ scripts/
 │   └── out/                   git-ignored generated SQL and validation report
 └── check-readme.ts            README completeness check
 src/
-├── index.ts                   OAuthProvider export, outer fetch with OAuth KV guard, scheduled dispatch
+├── index.ts                   lazy OAuthProvider per origin (`providerFor`), outer fetch with OAuth KV guard, scheduled dispatch
 ├── config.ts                  parses env vars: limits, caps, OWNER_EMAILS, UNLIMITED_EMAILS, STOCK_PROVIDERS, SNAPSHOT_EVERY_MINUTES
 ├── auth/
 │   ├── api-keys.ts            generate, hash, resolveExternalToken, 60 s positive memo
@@ -210,7 +210,7 @@ tests/
 Both resolved by the owner on 2026-10-25.
 
 - **Q1 Bonus and split ratios: RESOLVED (a)**. The owner sets each ratio with `admin set_action_ratio` after a `needs_ratio` notice. Until the action is applied (ratio entered, ex-date session stored, within the daily cap), adjusted history for that symbol is labeled as not yet adjusted for that action: responses carry `adjustmentPending` (or `rawPending` for backfilled bars the source already adjusted) and a `pendingAdjustments[]` list (see [data-model.md](data-model.md) corporate_actions and [mcp-tools.md](contracts/mcp-tools.md)).
-- **Q2 Primary stock source: RESOLVED (a)**. Keep `STOCK_PROVIDERS=egx,tradingview`. The first implementation task is a probe of the EGX endpoints from a deployed Worker; if it fails, the default becomes `tradingview,mubasher` (TradingView primary, Mubasher backup, so FR-013 still holds) and the outcome is recorded in research.md. The snapshot job raises a `source_switched` notice on any day the backup serves.
+- **Q2 Primary stock source: RESOLVED (a)**. Keep `STOCK_PROVIDERS=egx,tradingview`. The first implementation task is a probe of the EGX endpoints from a deployed Worker; if it fails, the default becomes `tradingview,mubasher` (TradingView primary, Mubasher backup, so FR-013 still holds) and the outcome is recorded in research.md. The snapshot job raises a `source_switched` notice on any day the backup serves. Amendment (owner decision D1, 2026-10-28): the `egx` provider was never built and the snapshot job ignores unknown ids, so `egx,tradingview` left production with TradingView only and no backup; `STOCK_PROVIDERS` is set to `tradingview,mubasher` now (T128), before the probe, and T007 records the probe outcome without removing the backup.
 
 ## Complexity Tracking
 
