@@ -10,7 +10,7 @@
 
 A visitor opens the home page, understands in one sentence what EGX MCP does, and can sign in.
 
-**Independent Test**: `GET /` returns `200` HTML with the `<h1>` "EGX MCP", the one sentence value line, a single "Sign in" link to `/dashboard`, and the agreement sentence with both policy links. There is no "Read the docs" button.
+**Independent Test**: `GET /` returns `200` HTML with the `<h1>` "EGX MCP", the value line of FR-H02, a single "Sign in" link to `/dashboard`, and the agreement sentence with both policy links. There is no "Read the docs" button.
 
 ### User Story 2: Connect an AI client (Priority: P1)
 

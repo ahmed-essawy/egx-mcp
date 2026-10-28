@@ -125,10 +125,12 @@ function suggest<E>(
 ): E[] {
   return entries
     .flatMap((entry) => {
-      const rank = suggestionRank(keysOf(entry), query);
-      return rank === null ? [] : [{ entry, rank }];
+      const keys = keysOf(entry);
+      const rank = suggestionRank(keys, query);
+      if (rank === null) return [];
+      return [{ entry, rank, shared: rank === RANK_FUZZY ? longestSharedPrefix(keys, query) : 0 }];
     })
-    .sort((a, b) => a.rank - b.rank || compareKeys(sortKeyOf(a.entry), sortKeyOf(b.entry)))
+    .sort((a, b) => a.rank - b.rank || b.shared - a.shared || compareKeys(sortKeyOf(a.entry), sortKeyOf(b.entry)))
     .slice(0, MAX_NOT_FOUND_SUGGESTIONS)
     .map(({ entry }) => entry);
 }

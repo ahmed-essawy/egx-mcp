@@ -158,6 +158,14 @@ describe("resolveSymbol", () => {
     expect(result).toEqual({ ok: false, code: "not_found", candidates: [prefixed, comi] });
   });
 
+  it("orders fuzzy suggestions by the longest shared prefix before the ticker", () => {
+    const early = symbol("EGS00000C910", "AAA1", null, "Alpha Holdings");
+    const closer = symbol("EGS00000C911", "ZZZ1", null, "Alphabet Industries");
+    const result = resolveSymbol(directory([early, closer]), "alphabxyz");
+
+    expect(result).toEqual({ ok: false, code: "not_found", candidates: [closer, early] });
+  });
+
   it("returns no suggestions for a one letter input", () => {
     const single = symbol("EGS00000C901", "QQQ1", null, null);
 
