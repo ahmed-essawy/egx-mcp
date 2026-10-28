@@ -177,7 +177,8 @@ src/
 │   └── gold-egypt.ts          isaghaRetail
 └── jobs/
     ├── dispatch.ts            cron string to job
-    ├── snapshot.ts
+    ├── snapshot.ts            also bootstraps a missing directory:v1 (job listing_bootstrap)
+    ├── listing-sync.ts        shared listing sync, used by end-of-day and the snapshot bootstrap
     ├── end-of-day.ts          discovery (listingSync step), bars, indices, discrepancies, events, adjustments, stats
     ├── reference.ts           funds, NAVs, corporate actions, figures, metals and FX
     └── maintenance.ts
