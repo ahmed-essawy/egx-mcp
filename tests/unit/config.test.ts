@@ -15,8 +15,8 @@ describe("loadConfig", () => {
       globalDailyRowsRead: 3500000,
       oauthDailyKvWrites: 600,
       userDailyCalls: 100,
-      ownerEmails: new Set(["ahm.elessawy@gmail.com"]),
-      unlimitedEmails: new Set(["loay.elessawy@gmail.com", "abdelrahman.m.essawy@gmail.com"]),
+      ownerEmails: new Set(["owner@example.test"]),
+      unlimitedEmails: new Set(["unlimited-one@example.test", "unlimited-two@example.test"]),
       stockProviders: ["tradingview", "mubasher"],
       snapshotEveryMinutes: 1,
       backfillMaxRowsPerDay: 36000,
@@ -34,6 +34,13 @@ describe("loadConfig", () => {
 
     expect(config.ownerEmails).toEqual(new Set(["a@x.com", "b@y.com"]));
     expect(config.unlimitedEmails).toEqual(new Set(["c@z.com"]));
+  });
+
+  it("treats missing email secrets as empty lists", () => {
+    const config = loadConfig(envWith({ OWNER_EMAILS: undefined, UNLIMITED_EMAILS: undefined } as never));
+
+    expect(config.ownerEmails).toEqual(new Set());
+    expect(config.unlimitedEmails).toEqual(new Set());
   });
 
   it("accepts a snapshot interval of 2 minutes", () => {

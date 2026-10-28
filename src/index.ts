@@ -4,7 +4,7 @@ import { loadConfig, resolvePublicOrigin } from "./config";
 import { nowSeconds } from "./domain/calendar";
 import { defaultHandler, internalErrorResponse } from "./http/routes";
 import { scheduled } from "./jobs/dispatch";
-import { guardOauth, oauthWriteCost } from "./limits/oauth-guard";
+import { guardOauthEntry } from "./limits/oauth-guard";
 
 function createProvider(origin: string): OAuthProvider<Env> {
   return new OAuthProvider<Env>(oauthOptions(origin));
@@ -25,9 +25,8 @@ function providerFor(request: Request, env: Env): OAuthProvider<Env> | null {
 }
 
 async function guardedResponse(request: Request, env: Env): Promise<Response | null> {
-  if (oauthWriteCost(request) === 0) return null;
   try {
-    return await guardOauth(env, loadConfig(env), request, nowSeconds());
+    return await guardOauthEntry(env, loadConfig(env), request, nowSeconds());
   } catch (error) {
     console.error("oauth_guard_failed", error instanceof Error ? error.message : "unknown");
     return internalErrorResponse();

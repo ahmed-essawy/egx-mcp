@@ -30,7 +30,12 @@ export default defineConfig(async () => {
               wrangler: { configPath: "./wrangler.jsonc" },
               miniflare: {
                 compatibilityDate: "2026-08-22",
-                bindings: { TEST_MIGRATIONS: migrations, PUBLIC_ORIGIN: "" },
+                bindings: {
+                  TEST_MIGRATIONS: migrations,
+                  PUBLIC_ORIGIN: "",
+                  OWNER_EMAILS: "owner@example.test",
+                  UNLIMITED_EMAILS: "unlimited-one@example.test,unlimited-two@example.test",
+                },
               },
             }),
           ],

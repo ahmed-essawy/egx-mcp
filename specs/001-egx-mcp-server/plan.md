@@ -118,7 +118,7 @@ scripts/
 └── check-readme.ts            README completeness check
 src/
 ├── index.ts                   lazy OAuthProvider per origin (`providerFor`), outer fetch with OAuth KV guard, scheduled dispatch
-├── config.ts                  parses env vars: limits, caps, OWNER_EMAILS, UNLIMITED_EMAILS, STOCK_PROVIDERS, SNAPSHOT_EVERY_MINUTES
+├── config.ts                  parses env vars and the OWNER_EMAILS and UNLIMITED_EMAILS secrets: limits, caps, STOCK_PROVIDERS, SNAPSHOT_EVERY_MINUTES
 ├── auth/
 │   ├── api-keys.ts            generate, hash, resolveExternalToken, 60 s positive memo
 │   ├── google.ts              Google authorize URL, code exchange, ID token checks
@@ -200,7 +200,7 @@ tests/
 ## Key design decisions
 
 1. **Stateless MCP, no Durable Objects**: `createMcpHandler` as `apiHandler` of `OAuthProvider`; tools are request and response only.
-2. **Two auth paths, one identity**: OAuth tokens carry `props.userId`; API keys resolve to the same `userId` in `resolveExternalToken` and carry both scopes. Owner is matched by email from `OWNER_EMAILS`.
+2. **Two auth paths, one identity**: OAuth tokens carry `props.userId`; API keys resolve to the same `userId` in `resolveExternalToken` and carry both scopes. Owner is matched by email from the `OWNER_EMAILS` secret.
 3. **Limits**: global caps (calls, rows read, OAuth KV writes) in `usage_global`; per-minute through the Rate Limiting binding (`period: 60`, `limit` 10); per-day through `usage_daily`. Settings are env vars (changed in the dashboard or `wrangler.jsonc`, no code change, FR-046a).
 4. **Snapshot**: 1-minute cron inside 09:55 to 14:45 Cairo (inclusive), providers in `STOCK_PROVIDERS` order, write only on change, movers precomputed; a trading day with no trade today by the open plus 30 minutes is treated as closed by every tool and skipped by the end-of-day job (holiday missing from the table); at a 2-minute cadence the window-end minute always runs.
 5. **Bulk writes**: `json_each(?)` upserts, one statement per table per job, including notices (`raiseNotices`, one statement per run); adjustment recompute as set-based `UPDATE`s under a daily cap; daily chunked purges in the reference job.

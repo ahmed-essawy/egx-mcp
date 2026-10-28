@@ -34,8 +34,8 @@ function invalidConfig(name: string): Error {
   return new Error(`invalid config: ${name}`);
 }
 
-function parseList(value: string): string[] {
-  return value
+function parseList(value: string | undefined): string[] {
+  return (value ?? "")
     .split(",")
     .map((item) => item.trim().toLowerCase())
     .filter((item) => item !== "");

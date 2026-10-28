@@ -1,6 +1,6 @@
 # Contract: owner admin tool
 
-Tool name `admin`. Allowed only when the caller's Google email is in the `OWNER_EMAILS` config var; any other caller gets `forbidden` (FR-048, Story 7 scenario 4). Not exempt from global caps.
+Tool name `admin`. Allowed only when the caller's Google email is in the `OWNER_EMAILS` secret (comma separated; a missing secret is an empty list); any other caller gets `forbidden` (FR-048, Story 7 scenario 4). Not exempt from global caps.
 
 Input is a discriminated union on `action`:
 

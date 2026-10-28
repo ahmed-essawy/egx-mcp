@@ -1,6 +1,8 @@
 interface GoogleSecrets {
   GOOGLE_CLIENT_SECRET: string;
   SESSION_SECRET: string;
+  OWNER_EMAILS?: string;
+  UNLIMITED_EMAILS?: string;
 }
 
 interface OAuthBinding {

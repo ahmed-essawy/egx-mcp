@@ -250,9 +250,11 @@ describe("oauth sign-in", () => {
     await seedSnapshot();
     await seedSymbols([stockSymbol(COMI_ISIN, COMI_TICKER, { nameEn: "COMI Company", sector: "Banks" })]);
     stubGoogle();
+    vi.spyOn(env.RATE_LIMITER, "limit").mockResolvedValue({ success: true });
   });
 
   afterEach(() => {
+    vi.restoreAllMocks();
     vi.unstubAllGlobals();
     restoreBindings();
     vi.useRealTimers();
@@ -418,6 +420,46 @@ describe("oauth sign-in", () => {
 
       expect(responses.map((response) => response.status).sort()).toEqual([201, 503]);
       expect(await readOauthWrites()).toBe(FIRST_SIGN_IN_KV_WRITES);
+    });
+
+    it("charges nothing for an /authorize request that validation refuses", async () => {
+      const response = await SELF.fetch(`${ORIGIN}/authorize?x=1`, { redirect: "manual" });
+
+      expect(response.status).toBe(400);
+      expect(await readOauthWrites()).toBe(0);
+      expect(await countGlobalRows()).toBe(0);
+    });
+
+    it("charges nothing for a /callback/google request with an unknown state", async () => {
+      const response = await SELF.fetch(`${ORIGIN}/callback/google?code=x&state=unknown`, { redirect: "manual" });
+
+      expect(response.status).toBe(400);
+      expect(await readOauthWrites()).toBe(0);
+    });
+
+    it("refuses an IP over its limit with 429 before any charge, on browser and JSON routes", async () => {
+      const limiter = vi.spyOn(env.RATE_LIMITER, "limit").mockResolvedValue({ success: false });
+      const headers = { "cf-connecting-ip": "203.0.113.7" };
+
+      const authorize = await SELF.fetch(`${ORIGIN}/authorize?x=1`, { headers, redirect: "manual" });
+      const token = await SELF.fetch(`${ORIGIN}/token`, { method: "POST", headers, body: "grant_type=authorization_code" });
+      const register = await SELF.fetch(`${ORIGIN}/register`, { method: "POST", headers, body: "{}" });
+
+      expect(authorize.status).toBe(429);
+      expect(authorize.headers.get("content-type")).toContain("text/html");
+      expect(token.status).toBe(429);
+      expect(await token.json()).toMatchObject({ error: "temporarily_unavailable" });
+      expect(register.status).toBe(429);
+      expect(limiter).toHaveBeenCalledWith({ key: "oauth:203.0.113.7" });
+      expect(await countGlobalRows()).toBe(0);
+    });
+
+    it("does not limit the landing page, public pages or /mcp by IP", async () => {
+      const limiter = vi.spyOn(env.RATE_LIMITER, "limit").mockResolvedValue({ success: false });
+
+      expect((await SELF.fetch(`${ORIGIN}/`)).status).toBe(200);
+      expect((await SELF.fetch(`${ORIGIN}/privacy`)).status).toBe(200);
+      expect(limiter).not.toHaveBeenCalled();
     });
 
     it("makes no usage_global call for the landing page, public pages or an unauthenticated /mcp", async () => {

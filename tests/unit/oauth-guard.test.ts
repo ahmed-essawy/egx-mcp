@@ -1,7 +1,7 @@
 import type { DatabaseSync } from "node:sqlite";
 import { beforeEach, describe, expect, it } from "vitest";
 import type { Config } from "../../src/config";
-import { guardOauth, oauthWriteCost } from "../../src/limits/oauth-guard";
+import { guardOauth, guardOauthEntry, oauthWriteCost } from "../../src/limits/oauth-guard";
 import { createSqliteD1 } from "../helpers/sqlite-d1";
 
 const ORIGIN = "https://egx.example";
@@ -9,9 +9,23 @@ const NOW = 1_792_000_000;
 const DAY = "2026-10-14";
 const SECONDS_TO_MIDNIGHT = 86_400 - (NOW % 86_400);
 const CAP = 6;
+const CALLER_LIMIT = 3;
+const CALLER_IP = "203.0.113.7";
+const RATE_LIMITED_MESSAGE = "Too many sign-in attempts from this address. Try again in a minute.";
 
-function req(method: string, path: string): Request {
-  return new Request(`${ORIGIN}${path}`, { method });
+function req(method: string, path: string, headers: Record<string, string> = {}): Request {
+  return new Request(`${ORIGIN}${path}`, { method, headers });
+}
+
+function limiterPerKey(limit: number): { limit: (options: { key: string }) => Promise<{ success: boolean }> } {
+  const seen = new Map<string, number>();
+  return {
+    limit: async ({ key }) => {
+      const count = (seen.get(key) ?? 0) + 1;
+      seen.set(key, count);
+      return { success: count <= limit };
+    },
+  };
 }
 
 describe("oauth guard", () => {
@@ -127,6 +141,96 @@ describe("oauth guard", () => {
       for (let i = 0; i < CAP; i += 1) await guardOauth(env, cfg, req("GET", "/authorize"), NOW);
 
       expect(await guardOauth(env, cfg, req("GET", "/authorize"), NOW + 86_400)).toBeNull();
+    });
+  });
+
+  describe("guardOauthEntry", () => {
+    beforeEach(() => {
+      env = { ...env, RATE_LIMITER: limiterPerKey(CALLER_LIMIT) } as Env;
+    });
+
+    it("charges POST /token 2 and POST /register 1 up front", async () => {
+      expect(await guardOauthEntry(env, cfg, req("POST", "/token"), NOW)).toBeNull();
+      expect(await guardOauthEntry(env, cfg, req("POST", "/register", { "cf-connecting-ip": "198.51.100.1" }), NOW)).toBeNull();
+
+      expect(counter()).toBe(3);
+    });
+
+    it.each([
+      ["GET", "/authorize"],
+      ["POST", "/authorize"],
+      ["GET", "/callback/google"],
+    ])("leaves the charge of %s %s to the handler", async (method, path) => {
+      expect(await guardOauthEntry(env, cfg, req(method, path), NOW)).toBeNull();
+
+      expect(counter()).toBeUndefined();
+    });
+
+    it("does not touch the limiter or the counter for an unguarded route", async () => {
+      expect(await guardOauthEntry(env, cfg, req("GET", "/"), NOW)).toBeNull();
+      expect(await guardOauthEntry(env, cfg, req("POST", "/mcp"), NOW)).toBeNull();
+
+      expect(counter()).toBeUndefined();
+    });
+
+    it("refuses a flood from one IP with an HTML 429 without charging", async () => {
+      for (let i = 0; i < CALLER_LIMIT; i += 1) {
+        expect(await guardOauthEntry(env, cfg, req("GET", "/authorize", { "cf-connecting-ip": CALLER_IP }), NOW)).toBeNull();
+      }
+
+      const response = await guardOauthEntry(env, cfg, req("GET", "/authorize", { "cf-connecting-ip": CALLER_IP }), NOW);
+
+      expect(response?.status).toBe(429);
+      expect(response?.headers.get("retry-after")).toBe("60");
+      expect(response?.headers.get("content-type")).toBe("text/html; charset=utf-8");
+      expect(await response?.text()).toContain(RATE_LIMITED_MESSAGE);
+      expect(counter()).toBeUndefined();
+    });
+
+    it.each([
+      ["POST", "/token"],
+      ["POST", "/register"],
+    ])("refuses a flood of %s %s from one IP with a JSON 429 without charging", async (method, path) => {
+      const headers = { "cf-connecting-ip": CALLER_IP };
+      for (let i = 0; i < CALLER_LIMIT; i += 1) await guardOauthEntry(env, cfg, req(method, path, headers), NOW);
+      const chargedBefore = counter();
+
+      const response = await guardOauthEntry(env, cfg, req(method, path, headers), NOW);
+
+      expect(response?.status).toBe(429);
+      expect(response?.headers.get("content-type")).toBe("application/json");
+      expect(await response?.json()).toEqual({ error: "temporarily_unavailable", error_description: RATE_LIMITED_MESSAGE });
+      expect(counter()).toBe(chargedBefore);
+    });
+
+    it("keeps another IP unaffected by a flooding one", async () => {
+      for (let i = 0; i <= CALLER_LIMIT; i += 1) {
+        await guardOauthEntry(env, cfg, req("GET", "/authorize", { "cf-connecting-ip": CALLER_IP }), NOW);
+      }
+
+      expect(await guardOauthEntry(env, cfg, req("GET", "/authorize", { "cf-connecting-ip": "198.51.100.9" }), NOW)).toBeNull();
+    });
+
+    it("shares one bucket among requests without an IP header", async () => {
+      for (let i = 0; i < CALLER_LIMIT; i += 1) await guardOauthEntry(env, cfg, req("GET", "/authorize"), NOW);
+
+      expect((await guardOauthEntry(env, cfg, req("GET", "/authorize"), NOW))?.status).toBe(429);
+    });
+
+    it("keys the limiter by the IP with the oauth prefix", async () => {
+      const keys: string[] = [];
+      env = { ...env, RATE_LIMITER: { limit: async ({ key }: { key: string }) => (keys.push(key), { success: true }) } } as Env;
+
+      await guardOauthEntry(env, cfg, req("GET", "/authorize", { "cf-connecting-ip": CALLER_IP }), NOW);
+      await guardOauthEntry(env, cfg, req("GET", "/authorize"), NOW);
+
+      expect(keys).toEqual([`oauth:${CALLER_IP}`, "oauth:unknown"]);
+    });
+
+    it("fails closed at the cap for an up-front route after the limiter passes", async () => {
+      for (let i = 0; i < CAP; i += 1) await guardOauth(env, cfg, req("GET", "/authorize"), NOW);
+
+      expect((await guardOauthEntry(env, cfg, req("POST", "/register"), NOW))?.status).toBe(503);
     });
   });
 });

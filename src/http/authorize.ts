@@ -3,6 +3,7 @@ import { API_KEY_SCOPES } from "../auth/api-keys";
 import { exchangeGoogleCode, googleAuthUrl, pkcePair } from "../auth/google";
 import { loadConfig, resolvePublicOrigin } from "../config";
 import { nowSeconds } from "../domain/calendar";
+import { guardOauth } from "../limits/oauth-guard";
 import { capacityResponse, messageResponse, redirect } from "./responses";
 import { accountDeletedResponse, signInGoogleUser } from "./sign-in";
 import { STATUS_BAD_GATEWAY, STATUS_BAD_REQUEST, STATUS_FOUND, STATUS_INTERNAL_ERROR, STATUS_OK } from "./status";
@@ -61,6 +62,10 @@ async function guarded(action: () => Promise<Response>): Promise<Response> {
   }
 }
 
+function chargeKvWrites(request: Request, env: Env): Promise<Response | null> {
+  return guardOauth(env, loadConfig(env), request, nowSeconds());
+}
+
 function unconfiguredResponse(): Response {
   return messageResponse("Sign-in unavailable", "The service is not configured.", STATUS_INTERNAL_ERROR);
 }
@@ -68,6 +73,8 @@ function unconfiguredResponse(): Response {
 export function authorizeHandler(request: Request, env: Env): Promise<Response> {
   return guarded(async () => {
     const authRequest = await env.OAUTH_PROVIDER.parseAuthRequest(request);
+    const refused = await chargeKvWrites(request, env);
+    if (refused !== null) return refused;
     const details = await env.OAUTH_PROVIDER.describeConsent(authRequest);
     const consent = await env.OAUTH_PROVIDER.beginConsent(authRequest);
     const html = consentView({
@@ -90,9 +97,13 @@ export function authorizeDecisionHandler(request: Request, env: Env): Promise<Re
     const handle = String(form.get("handle") ?? "");
     if (form.get("decision") !== APPROVE_DECISION) {
       const denied = await env.OAUTH_PROVIDER.denyConsent(request, handle);
+      const deniedRefusal = await chargeKvWrites(request, env);
+      if (deniedRefusal !== null) return deniedRefusal;
       return new Response(null, { status: STATUS_FOUND, headers: denied.headers });
     }
     const approved = await env.OAUTH_PROVIDER.approveConsent(request, handle);
+    const approvedRefusal = await chargeKvWrites(request, env);
+    if (approvedRefusal !== null) return approvedRefusal;
     const { verifier, challenge } = await pkcePair();
     const upstream = await env.OAUTH_PROVIDER.beginUpstream(approved.request, {
       data: { verifier } satisfies UpstreamData,
@@ -113,6 +124,8 @@ export function googleCallbackHandler(request: Request, env: Env): Promise<Respo
     const origin = resolvePublicOrigin(request, env);
     if (origin === null) return unconfiguredResponse();
     const resumed = await env.OAUTH_PROVIDER.finishUpstream<UpstreamData>(request);
+    const refused = await chargeKvWrites(request, env);
+    if (refused !== null) return refused;
     const { request: original, data, headers } = resumed;
     const cookies = headers.getSetCookie();
     const params = new URL(request.url).searchParams;

@@ -19,6 +19,8 @@ npx wrangler kv namespace create OAUTH_KV
 (set GOOGLE_CLIENT_ID in the vars of wrangler.jsonc, it is a var and not a secret)
 npx wrangler secret put GOOGLE_CLIENT_SECRET
 npx wrangler secret put SESSION_SECRET
+npx wrangler secret put OWNER_EMAILS
+npx wrangler secret put UNLIMITED_EMAILS
 npx wrangler d1 migrations apply egx --local
 npx wrangler d1 migrations apply egx --remote
 npm run typecheck

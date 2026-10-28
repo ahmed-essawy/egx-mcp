@@ -31,8 +31,6 @@
     "GLOBAL_DAILY_ROWS_READ": "3500000",
     "OAUTH_DAILY_KV_WRITES": "600",
     "USER_DAILY_CALLS": "100",
-    "OWNER_EMAILS": "ahm.elessawy@gmail.com",
-    "UNLIMITED_EMAILS": "loay.elessawy@gmail.com,abdelrahman.m.essawy@gmail.com",
     "STOCK_PROVIDERS": "tradingview,mubasher",
     "SNAPSHOT_EVERY_MINUTES": "1",
     "BACKFILL_MAX_ROWS_PER_DAY": "36000",

@@ -1,3 +1,4 @@
+import { env as workerEnv } from "cloudflare:test";
 import { describe, expect, it } from "vitest";
 import { authorizeHandler, grantedScopes } from "../../src/http/authorize";
 
@@ -43,7 +44,7 @@ describe("grantedScopes", () => {
 
 describe("authorizeHandler", () => {
   async function consentFor(details: Record<string, unknown>): Promise<Response> {
-    const env = { OAUTH_PROVIDER: providerFor(details) } as Env;
+    const env = { ...workerEnv, OAUTH_PROVIDER: providerFor(details) } as Env;
     return authorizeHandler(new Request("https://egx.example/authorize"), env);
   }
 

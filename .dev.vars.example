@@ -1,0 +1,4 @@
+GOOGLE_CLIENT_SECRET=replace-with-your-google-client-secret
+SESSION_SECRET=replace-with-a-long-random-string
+OWNER_EMAILS=owner@example.com
+UNLIMITED_EMAILS=friend@example.com,other@example.com
