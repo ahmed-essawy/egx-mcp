@@ -59,7 +59,7 @@ From analyze round 3, out of scope for the planning fix round by owner decision;
 
 - C19: backfill resume and rerun across a new CSV version of the same symbol.
 - C21: account deletion is refused when the personal-write cap is reached.
-- F19: read tools that call `saveCrossings` and the personal-write capacity.
+- F19: read tools that call `saveCrossings` and the personal-write capacity. Decision: `portfolio_get` and `what_changed_since` are registered with `readOnly: true`, because the crossing state write is internal bookkeeping and not a user-visible change.
 - C23: OAuth KV reads are not bounded for refused requests.
 - C24: CSV validation does not detect corporate actions the source omitted.
 - F20: wording drift between artifacts.

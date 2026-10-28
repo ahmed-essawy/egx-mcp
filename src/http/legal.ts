@@ -45,7 +45,7 @@ const PRIVACY_SECTIONS: LegalSection[] = [
     paragraphs: [
       "When you sign in with Google (scopes openid email profile) we receive your Google account identifier, your email address and your display name. We use the identifier and email address to identify your account, show who is signed in and apply the limits that the operator sets for individual accounts. Your display name is stored with your account and is not shown or shared.",
       "We keep a record for each API key you create (see how API keys are stored) and a count of your calls per tool per day (see usage records and limits).",
-      "If you use the portfolio and price-level features, which are being added, the holdings (symbol, quantity, cost per share, acquisition date) and price levels (symbol, above or below, level, last crossing time) you save will be used only to answer your own requests and will be visible only to you.",
+      "If you use the portfolio and price-level features, the holdings (symbol, quantity, cost per share, acquisition date) and price levels (symbol, above or below, level, last crossing time) you save will be used only to answer your own requests and will be visible only to you.",
     ],
   },
   {

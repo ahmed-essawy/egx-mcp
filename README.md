@@ -4,7 +4,7 @@ An MCP (Model Context Protocol) server that gives AI assistants read access to E
 
 Status: the MVP runs at <https://egx-mcp.essawy.workers.dev/> (see also the [privacy policy](https://egx-mcp.essawy.workers.dev/privacy) and the [terms of use](https://egx-mcp.essawy.workers.dev/terms)), and no permission from EGX or EGID to share the data has been obtained yet. See [Data sources and limits](#data-sources-and-limits).
 
-Current build (MVP): only 7 tools are enabled (`search`, `get_quotes`, `get_market_overview`, `get_indices`, `get_daily_summary`, `get_metals` and `get_usd_egp`). Sign-in with Google from Claude and ChatGPT is not available yet (coming later), so connect with an API key from the dashboard. The `admin` tool, portfolio, price levels, funds and the other tools are not built yet, so the owner tasks, the holiday table and the notices described below are planned. Parts of this guide that describe later work are marked "(coming later)".
+Current build (MVP): only 14 tools are enabled (`search`, `get_quotes`, `get_market_overview`, `get_indices`, `get_daily_summary`, `get_metals`, `get_usd_egp`, `portfolio_get`, `portfolio_upsert_holding`, `portfolio_remove_holding`, `price_level_set`, `price_level_remove`, `price_levels_list` and `what_changed_since`). Sign-in with Google from Claude and ChatGPT is not available yet (coming later), so connect with an API key from the dashboard. The `admin` tool, funds and the other tools are not built yet, so the owner tasks, the holiday table and the notices described below are planned. Parts of this guide that describe later work are marked "(coming later)".
 
 ## Overview
 
@@ -13,7 +13,7 @@ The server publishes its home page at <https://egx-mcp.essawy.workers.dev/>.
 What the server does:
 
 - Answers questions about EGX stocks and EGX indices. Gold and silver prices in Egypt and worldwide and the USD/EGP rate are available. Mutual funds, dividends and corporate actions, and company financial figures are coming later.
-- Keeps a personal portfolio and price levels for each signed-in user, and reports what changed since a given time (coming later).
+- Keeps a personal portfolio and price levels for each signed-in user, and reports what changed since a given time.
 - Gives the owner an `admin` tool for notices, the holiday table, inflation figures and corporate action ratios (coming later).
 
 Data coverage:
@@ -109,7 +109,7 @@ If a client reports `unauthorized` after you revoke a key, wait up to 2 minutes 
 
 ## Tools
 
-This build enables only `search`, `get_quotes`, `get_market_overview`, `get_indices`, `get_daily_summary`, `get_metals` and `get_usd_egp`. The other tools below are planned and are not registered yet (coming later).
+This build enables only `search`, `get_quotes`, `get_market_overview`, `get_indices`, `get_daily_summary`, `get_metals`, `get_usd_egp`, `portfolio_get`, `portfolio_upsert_holding`, `portfolio_remove_holding`, `price_level_set`, `price_level_remove`, `price_levels_list` and `what_changed_since`. The other tools below are planned and are not registered yet (coming later).
 
 Symbols can be given as a ticker, an ISIN, or an Arabic or English name. Index names accept the short aliases `EGX70` (meaning `EGX70EWI`) and `EGX100` (meaning `EGX100EWI`).
 

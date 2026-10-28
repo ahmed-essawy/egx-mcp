@@ -17,12 +17,18 @@ import { envelopeSchema } from "../output-schema";
 import { MAX_SYMBOL_INPUT_LENGTH, resolveSymbol } from "../resolve";
 import { roundPercent, roundPrice, roundTurnover } from "../rounding";
 import { loadMarketClock, sessionMeta, type MarketClock } from "../session";
-import { DIRECTORY_MISSING_MESSAGE, identityOf, identitySchema, newestDataTime } from "../shared";
+import {
+  DIRECTORY_MISSING_MESSAGE,
+  identityOf,
+  identitySchema,
+  newestDataTime,
+  SNAPSHOT_FIELD,
+  SNAPSHOT_MISSING_REASON,
+  staleReasonOf,
+} from "../shared";
 
 const MIN_SYMBOLS = 1;
 const MAX_SYMBOLS = 20;
-const SNAPSHOT_FIELD = "snapshot";
-const SNAPSHOT_MISSING_REASON = "snapshot not built yet";
 
 const inputSchema = z.object({
   symbols: z.array(z.string().min(1).max(MAX_SYMBOL_INPUT_LENGTH)).min(MIN_SYMBOLS).max(MAX_SYMBOLS),
@@ -104,14 +110,6 @@ function serveInput(input: string, directory: Directory, snapshot: Snapshot | nu
       ? { input, status: "ambiguous", candidates }
       : { input, status: "not_found", suggestions: candidates };
   return { item, quote: null };
-}
-
-function staleReasonOf(quotes: QuoteEntry[], clock: MarketClock): string | null {
-  const staleDates = quotes
-    .filter((quote) => isQuoteStale(quote.td, clock.sessionDate, clock.holidays))
-    .map((quote) => quote.td);
-  if (staleDates.length === 0) return null;
-  return `Data dated ${staleDates.sort()[0]} is older than the last completed session.`;
 }
 
 function metaFor(quotes: QuoteEntry[], snapshot: Snapshot | null, clock: MarketClock): Meta {

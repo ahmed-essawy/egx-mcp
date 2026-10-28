@@ -214,6 +214,13 @@ describe("createServer", () => {
       "get_daily_summary",
       "get_metals",
       "get_usd_egp",
+      "portfolio_get",
+      "portfolio_upsert_holding",
+      "portfolio_remove_holding",
+      "price_level_set",
+      "price_level_remove",
+      "price_levels_list",
+      "what_changed_since",
     ]);
   });
 });

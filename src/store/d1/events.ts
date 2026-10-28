@@ -30,6 +30,8 @@ export type NewMarketEvent = {
 
 export type MarketEvent = NewMarketEvent & { id: number };
 
+export type EventsPage = { events: MarketEvent[]; rowsRead: number };
+
 export type Discrepancy = {
   isin: string;
   sessionDate: string;
@@ -72,7 +74,8 @@ type DiscrepancyRow = {
 };
 
 const MAX_NOTICES_PAGE = 50;
-const DEFAULT_EVENTS_LIMIT = 200;
+export const DEFAULT_EVENTS_LIMIT = 200;
+const ALL_EVENT_KINDS: readonly EventKind[] = ["new_nav", "big_move", "new_listing", "corporate_action", "disclosure"];
 const FIRST_PAGE_CURSOR: NoticeCursor = { createdAt: Number.MAX_SAFE_INTEGER, id: Number.MAX_SAFE_INTEGER };
 
 export async function raiseNotices(db: D1Database, notices: NewNotice[]): Promise<void> {
@@ -160,14 +163,16 @@ export async function listEventsSince(
   db: D1Database,
   since: number,
   limit: number = DEFAULT_EVENTS_LIMIT,
-): Promise<MarketEvent[]> {
-  const { results } = await db
+  kinds: readonly EventKind[] = ALL_EVENT_KINDS,
+): Promise<EventsPage> {
+  const { results, meta } = await db
     .prepare(
-      "SELECT id, kind, occurred_at, isin, fund_id, payload FROM market_events WHERE occurred_at > ?1 ORDER BY occurred_at, id LIMIT ?2",
+      `SELECT id, kind, occurred_at, isin, fund_id, payload FROM market_events
+       WHERE occurred_at > ?1 AND kind IN (SELECT value FROM json_each(?2)) ORDER BY occurred_at, id LIMIT ?3`,
     )
-    .bind(since, limit)
+    .bind(since, JSON.stringify(kinds), limit)
     .all<MarketEventRow>();
-  return results.map((row) => ({
+  const events = results.map((row) => ({
     id: row.id,
     kind: row.kind,
     occurredAt: row.occurred_at,
@@ -175,6 +180,7 @@ export async function listEventsSince(
     fundId: row.fund_id,
     payload: JSON.parse(row.payload) as Record<string, unknown>,
   }));
+  return { events, rowsRead: meta.rows_read };
 }
 
 export async function insertDiscrepancies(db: D1Database, discrepancies: Discrepancy[]): Promise<void> {

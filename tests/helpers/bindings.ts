@@ -26,6 +26,9 @@ export async function clearState(): Promise<void> {
     env.DB.prepare("DELETE FROM usage_daily"),
     env.DB.prepare("DELETE FROM usage_global"),
     env.DB.prepare("DELETE FROM daily_bars"),
+    env.DB.prepare("DELETE FROM holdings"),
+    env.DB.prepare("DELETE FROM price_levels"),
+    env.DB.prepare("DELETE FROM market_events"),
     env.DB.prepare("DELETE FROM api_keys"),
     env.DB.prepare("DELETE FROM users"),
   ]);

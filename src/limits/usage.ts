@@ -35,6 +35,10 @@ function toIso(unixSeconds: number): string {
   return new Date(unixSeconds * MS_PER_SECOND).toISOString();
 }
 
+export function capacityRetryAt(now: number): string {
+  return toIso(nextUtcMidnight(now));
+}
+
 function refuse(code: Refusal["code"], message: string, retryAtSeconds: number): Refusal {
   return { ok: false, code, message, retryAt: toIso(retryAtSeconds) };
 }
