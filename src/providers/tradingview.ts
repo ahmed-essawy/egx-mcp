@@ -19,6 +19,7 @@ const INDEX_COLUMNS = ["name", "close", "change", "last_bar_update_time"];
 const SCAN_RANGE = [0, 400];
 const STOCK_TYPE = "stock";
 const LISTING_MARKET = "main";
+const LISTING_CURRENCY = "EGP";
 
 const COLUMNS = [
   "name",
@@ -38,6 +39,7 @@ const COLUMNS = [
   "type",
   "total_shares_outstanding",
   "float_shares_outstanding",
+  "currency",
 ] as const;
 
 type Column = (typeof COLUMNS)[number];
@@ -45,6 +47,12 @@ type ScanRow = Record<Column, unknown>;
 
 function asNumber(value: unknown): number | null {
   return typeof value === "number" && Number.isFinite(value) ? value : null;
+}
+
+function tradedValue(row: ScanRow): number | null {
+  const currency = asString(row.currency);
+  if (currency !== null && currency !== LISTING_CURRENCY) return null;
+  return asNumber(row["Value.Traded"]);
 }
 
 function toScanRow(values: unknown[]): ScanRow {
@@ -93,7 +101,7 @@ function toQuote(row: ScanRow): ProviderQuote | null {
     change: changeAbs,
     changePct: asNumber(row.change),
     volume: asNumber(row.volume) ?? 0,
-    value: asNumber(row["Value.Traded"]),
+    value: tradedValue(row),
     tradeTime,
     tradeDate: cairoParts(time).date,
   };
