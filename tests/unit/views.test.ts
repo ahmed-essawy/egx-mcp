@@ -13,7 +13,7 @@ import {
   TERMS_PATH,
   type DashboardInput,
 } from "../../src/http/views";
-import { FOOTER_NAV } from "../helpers/html";
+import { AFFILIATION, FOOTER_NAV, ICON_LINKS, SITE_HEADER } from "../helpers/html";
 
 const SCRIPT_PAYLOAD = "<script>alert(1)</script>";
 const ESCAPED_SCRIPT_OPEN = "&lt;script&gt;";
@@ -40,7 +40,7 @@ const BEARER_HEADER = "Authorization: Bearer &lt;your key&gt;";
 const CONNECT_NOTE =
   "Create your key after signing in. Works in Claude (custom connector, no sign-in, add the header), Claude Code and Cursor.";
 const NOTICE =
-  "Independent service, not affiliated with the Egyptian Exchange. Data is delayed, unofficial and for information only, not financial advice. Sources: EGX website, TradingView, Mubasher Info, iSagha.";
+  "Data is delayed, unofficial and for information only, not financial advice. Sources: EGX website, TradingView, Mubasher Info, iSagha.";
 const GITHUB_LINK = '<a href="https://github.com/ahmed-essawy/egx-mcp">GitHub</a>';
 const REMOVED_TEXT = [
   "What you can ask",
@@ -92,6 +92,13 @@ describe("escapeHtml", () => {
 });
 
 describe("dashboardView", () => {
+  it("shows the logo header", () => {
+    const html = dashboardView(dashboardInput());
+
+    expect(html).toContain(SITE_HEADER);
+    expect(html).toContain(ICON_LINKS);
+  });
+
   it("escapes a script tag in the email", () => {
     const html = dashboardView(dashboardInput({ email: SCRIPT_PAYLOAD }));
 
@@ -248,6 +255,10 @@ describe("landingView", () => {
     expect(html).toContain(NOTICE);
   });
 
+  it("states the affiliation once", () => {
+    expect(html.split(AFFILIATION)).toHaveLength(2);
+  });
+
   it("links the privacy policy, terms and GitHub in the footer", () => {
     expect(html).toContain(FOOTER_NAV);
     expect(html).toContain(GITHUB_LINK);
@@ -284,6 +295,12 @@ describe("path constants", () => {
 });
 
 describe("STYLESHEET", () => {
+  it("styles the header row without external images", () => {
+    expect(STYLESHEET).toContain("header, main, footer {");
+    expect(STYLESHEET).toContain("header { display: flex;");
+    expect(STYLESHEET).toContain(".affiliation");
+  });
+
   it("styles the footer like the main content and separates it with a border", () => {
     expect(STYLESHEET).toContain("main, footer {");
     expect(STYLESHEET).toContain("footer { border-top");
@@ -325,6 +342,17 @@ describe("page", () => {
     expect(html).toContain('<link rel="stylesheet" href="/styles.css">');
     expect(html).not.toMatch(/<style/i);
     expect(html).not.toMatch(/style=/i);
+  });
+
+  it("links the favicons and the apple touch icon before the stylesheet", () => {
+    expect(html).toContain(ICON_LINKS);
+    expect(html.indexOf(ICON_LINKS)).toBeLessThan(html.indexOf('<link rel="stylesheet"'));
+  });
+
+  it("shows the linked logo with alt text and the affiliation in a header between the skip link and main", () => {
+    expect(html).toContain(SITE_HEADER);
+    expect(html.indexOf('href="#main"')).toBeLessThan(html.indexOf("<header>"));
+    expect(html.indexOf("<header>")).toBeLessThan(html.indexOf("<main"));
   });
 
   it("escapes the title and keeps the body markup", () => {

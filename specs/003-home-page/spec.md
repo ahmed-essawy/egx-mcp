@@ -66,7 +66,7 @@ FR-H02 to FR-H07 are replaced by the following. FR-H01 and FR-H08 to FR-H09 stay
 
 - **FR-H02 Hero**: `<h1>` "EGX MCP"; one value line "Ask your AI assistant about Egyptian Exchange stocks and indices. Data is delayed."; one "Sign in" link to `/dashboard` styled as a button; then the agreement sentence "By signing in you agree to the Terms of use and acknowledge the Privacy policy." with both linked.
 - **FR-H03 Connect block**: a section with `<h2>` "Connect your assistant" and, each in its own monospace box, the server URL `<origin>/mcp` and the header `Authorization: Bearer <your key>`, then one line: "Create your key after signing in. Works in Claude (custom connector, no sign-in, add the header), Claude Code and Cursor."
-- **FR-H04 Notice**: one paragraph: "Independent service, not affiliated with the Egyptian Exchange. Data is delayed, unofficial and for information only, not financial advice. Sources: EGX website, TradingView, Mubasher Info, iSagha."
+- **FR-H04 Notice**: one paragraph: "Independent service, not affiliated with the Egyptian Exchange. Data is delayed, unofficial and for information only, not financial advice. Sources: EGX website, TradingView, Mubasher Info, iSagha." Superseded by spec 005 FR-I04: the independence sentence moves to the site header and the notice starts at "Data is delayed".
 - **FR-H05 Removed**: the example prompts, the three step guide, the tool list, the data sources section, the "Read the docs" button and the claim that Claude custom connectors cannot send a header.
 - **FR-H06 Footer**: the shared footer on every page: Home, Privacy policy, Terms of use and GitHub. The GitHub link is the only external link on the home page.
 - **FR-H07**: reserved.

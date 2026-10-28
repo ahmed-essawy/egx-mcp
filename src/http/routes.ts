@@ -7,12 +7,16 @@ import {
   logoutHandler,
   revokeKeyHandler,
 } from "./dashboard";
+import { ICONS } from "./icons";
 import { privacyView, termsView } from "./legal";
 import { STATUS_INTERNAL_ERROR, STATUS_NOT_FOUND, STATUS_NOT_IMPLEMENTED, STATUS_OK } from "./status";
 import { HTML_HEADERS, htmlResponse, landingView, mcpUrl, messageView, STYLESHEET } from "./views";
 
 const CSS_CACHE_CONTROL = "public, max-age=300";
 const CSS_CONTENT_TYPE = "text/css; charset=utf-8";
+const ICON_CACHE_CONTROL = "public, max-age=86400";
+const REGEX_METACHARACTERS = /[.*+?^${}()|[\]\\]/g;
+const PNG_CONTENT_TYPE = "image/png";
 const SIGN_IN_UNAVAILABLE_TITLE = "Sign-in not available yet";
 const SIGN_IN_UNAVAILABLE_TEXT = "Sign-in for AI assistants is not available yet. Use an API key from the dashboard instead.";
 
@@ -21,6 +25,14 @@ type Route = { method: string; pattern: RegExp; handler: RouteHandler };
 
 function stylesheetResponse(): Response {
   return new Response(STYLESHEET, { headers: { ...HTML_HEADERS, "content-type": CSS_CONTENT_TYPE, "cache-control": CSS_CACHE_CONTROL } });
+}
+
+function iconResponse(body: Uint8Array): Response {
+  return new Response(body, { headers: { ...HTML_HEADERS, "content-type": PNG_CONTENT_TYPE, "cache-control": ICON_CACHE_CONTROL } });
+}
+
+function exactPath(path: string): RegExp {
+  return new RegExp(`^${path.replace(REGEX_METACHARACTERS, "\\$&")}$`);
 }
 
 function landingResponse(request: Request, env: Env): Response {
@@ -41,9 +53,16 @@ export function internalErrorResponse(): Response {
   return htmlResponse(messageView("Something went wrong", "The request could not be completed."), STATUS_INTERNAL_ERROR);
 }
 
+const ICON_ROUTES: Route[] = [...ICONS].map(([path, body]) => ({
+  method: "GET",
+  pattern: exactPath(path),
+  handler: () => iconResponse(body),
+}));
+
 const ROUTES: Route[] = [
   { method: "GET", pattern: /^\/$/, handler: landingResponse },
   { method: "GET", pattern: /^\/styles\.css$/, handler: stylesheetResponse },
+  ...ICON_ROUTES,
   { method: "GET", pattern: /^\/privacy$/, handler: () => htmlResponse(privacyView(), STATUS_OK) },
   { method: "GET", pattern: /^\/terms$/, handler: () => htmlResponse(termsView(), STATUS_OK) },
   { method: "GET", pattern: /^\/dashboard\/login$/, handler: loginHandler },

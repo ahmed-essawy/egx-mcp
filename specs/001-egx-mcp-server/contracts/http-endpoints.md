@@ -22,9 +22,10 @@ Session: HMAC-SHA-256 signed cookie `__Host-egx_session` (`user id`, `exp` 12 h)
 
 | Method and path | Behavior |
 |---|---|
-| `GET /` | Public home page (spec 003, amendment 1): "EGX MCP", one sentence, a "Sign in" button (`/dashboard`) with "By signing in you agree to the Terms of use and acknowledge the Privacy policy" (both linked); a "Connect your assistant" block showing the MCP address `<origin>/mcp` (origin from `PUBLIC_ORIGIN`, or the request origin when it is empty; `500` when it is invalid) and `Authorization: Bearer <your key>`; one independence and delayed, unofficial, not advice notice. No D1 or KV read, no cookie. The only external link is the GitHub link in the footer |
+| `GET /` | Public home page (spec 003, amendment 1): "EGX MCP", one sentence, a "Sign in" button (`/dashboard`) with "By signing in you agree to the Terms of use and acknowledge the Privacy policy" (both linked); a "Connect your assistant" block showing the MCP address `<origin>/mcp` (origin from `PUBLIC_ORIGIN`, or the request origin when it is empty; `500` when it is invalid) and `Authorization: Bearer <your key>`; one notice that data is delayed, unofficial and not advice, with the sources (the independence sentence is in the site header, spec 005). No D1 or KV read, no cookie. The only external link is the GitHub link in the footer |
 | `GET /privacy` | Public static privacy policy (spec 002, FR-L03). No session, no cookies, no D1 or KV read. Other methods `404` |
 | `GET /terms` | Public static terms of use (spec 002, FR-L04). No session, no cookies, no D1 or KV read. Other methods `404` |
+| `GET /favicon-32.png`, `GET /favicon.ico`, `GET /apple-touch-icon.png`, `GET /icon-192.png` | Public static PNG logo images (spec 005): 32, 32, 180 and 192 px, `Content-Type: image/png`, `Cache-Control: public, max-age=86400`, no cookie, no D1 or KV read. Other methods `404` |
 | `GET /dashboard/login` | Redirect to Google (state cookie, PKCE) |
 | `GET /dashboard/callback` | Verify Google ID token, upsert user, set session, redirect to `/dashboard` |
 | `GET /dashboard` | List keys: `prefix`, `name`, `createdAt`, `lastUsedAt`, `revokedAt`; today's usage per tool |

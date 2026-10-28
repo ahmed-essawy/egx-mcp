@@ -9,6 +9,12 @@ export const HOME_PATH = "/";
 export const PRIVACY_PATH = "/privacy";
 export const TERMS_PATH = "/terms";
 const STYLESHEET_PATH = "/styles.css";
+export const FAVICON_PATH = "/favicon-32.png";
+export const ICON_PATH = "/icon-192.png";
+export const APPLE_TOUCH_ICON_PATH = "/apple-touch-icon.png";
+const LOGO_ALT = "EGX MCP home";
+const LOGO_SIZE = 48;
+const AFFILIATION = "Independent service, not affiliated with the Egyptian Exchange.";
 export const MCP_PATH = "/mcp";
 export const DASHBOARD_PATH = "/dashboard";
 const BEARER_HEADER = "Authorization: Bearer <your key>";
@@ -18,7 +24,7 @@ const VALUE_LINE = "Ask your AI assistant about Egyptian Exchange stocks and ind
 const CONNECT_NOTE =
   "Create your key after signing in. Works in Claude (custom connector, no sign-in, add the header), Claude Code and Cursor.";
 const NOTICE =
-  "Independent service, not affiliated with the Egyptian Exchange. Data is delayed, unofficial and for information only, not financial advice. Sources: EGX website, TradingView, Mubasher Info, iSagha.";
+  "Data is delayed, unofficial and for information only, not financial advice. Sources: EGX website, TradingView, Mubasher Info, iSagha.";
 export const DATA_SOURCES = [
   "EGX website",
   "TradingView",
@@ -42,9 +48,12 @@ export const STYLESHEET = `
 :root { color-scheme: light dark; --text: #14202b; --muted: #52606d; --background: #f8fafb; --surface: #eef2f6; --border: #7d8996; --link: #1d4f91; --on-link: #ffffff; --error: #9b1c1c; }
 @media (prefers-color-scheme: dark) { :root { --text: #e7edf3; --muted: #9aa8b5; --background: #0f1720; --surface: #17212b; --border: #66798b; --link: #8db4f0; --on-link: #0f1720; --error: #ff8a80; } }
 body { font-family: system-ui, sans-serif; line-height: 1.6; margin: 0; color: var(--text); background: var(--background); }
-main, footer { max-width: 38rem; margin: 0 auto; padding: 1.5rem 1rem; }
+header, main, footer { max-width: 38rem; margin: 0 auto; padding: 1.5rem 1rem; }
 footer { border-top: 1px solid var(--border); }
 footer nav { display: flex; flex-wrap: wrap; gap: 1rem; }
+header { display: flex; flex-wrap: wrap; align-items: center; gap: 0.75rem; padding-bottom: 0; }
+.brand img { display: block; }
+.affiliation { margin: 0; }
 a { color: var(--link); }
 .skip-link { position: absolute; left: -999px; }
 .skip-link:focus { left: 1rem; top: 1rem; background: var(--background); padding: 0.5rem; }
@@ -59,7 +68,7 @@ code { font-family: ui-monospace, monospace; overflow-wrap: anywhere; }
 .hero h1 { font-size: 3rem; line-height: 1.1; margin: 0 0 1rem; }
 .lead { font-size: 1.5rem; line-height: 1.3; margin: 0 0 2.5rem; }
 .button { display: inline-block; padding: 0.75rem 1.5rem; border-radius: 0.25rem; font-weight: 600; text-decoration: none; background: var(--link); color: var(--on-link); }
-.agreement, .notice { color: var(--muted); font-size: 0.875rem; }
+.agreement, .notice, .affiliation { color: var(--muted); font-size: 0.875rem; }
 .connect { padding: 1.25rem; border: 1px solid var(--border); background: var(--surface); }
 .connect h2 { font-size: 1rem; margin: 0 0 0.5rem; }
 .connect code { display: block; margin-block: 0.5rem; padding: 0.5rem 0.75rem; border: 1px solid var(--border); background: var(--background); }
@@ -105,10 +114,12 @@ export function page(title: string, bodyHtml: string): string {
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>${escapeHtml(title)}</title>
+${iconLinks()}
 <link rel="stylesheet" href="${STYLESHEET_PATH}">
 </head>
 <body>
 <a class="skip-link" href="#main">Skip to main content</a>
+${siteHeader()}
 <main id="main">
 ${bodyHtml}
 </main>
@@ -178,6 +189,18 @@ function connectSection(serverUrl: string): string {
 
 function noticeSection(): string {
   return `<p class="notice">${escapeHtml(NOTICE)}</p>`;
+}
+
+function iconLinks(): string {
+  return [
+    `<link rel="icon" type="image/png" sizes="32x32" href="${FAVICON_PATH}">`,
+    `<link rel="icon" type="image/png" sizes="192x192" href="${ICON_PATH}">`,
+    `<link rel="apple-touch-icon" sizes="180x180" href="${APPLE_TOUCH_ICON_PATH}">`,
+  ].join("\n");
+}
+
+function siteHeader(): string {
+  return `<header><a class="brand" href="${HOME_PATH}"><img src="${ICON_PATH}" alt="${LOGO_ALT}" width="${LOGO_SIZE}" height="${LOGO_SIZE}"></a><p class="affiliation">${escapeHtml(AFFILIATION)}</p></header>`;
 }
 
 function siteFooter(): string {
