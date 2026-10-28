@@ -26,6 +26,10 @@ const JOBS_BY_CRON: Record<string, ScheduledJob> = {
   [MAINTENANCE_CRON]: { name: "maintenance", run: maintenanceJob },
 };
 
+export const JOB_NAME_BY_CRON: Record<string, string> = Object.fromEntries(
+  Object.entries(JOBS_BY_CRON).map(([cron, job]) => [cron, job.name]),
+);
+
 async function recordUnhandled(scheduledJob: ScheduledJob, env: Env, now: number, error: unknown): Promise<void> {
   try {
     await raiseNotices(env.DB, [jobFailedNotice(scheduledJob.name, UNHANDLED_STEP, "", errorMessage(error), now)]);

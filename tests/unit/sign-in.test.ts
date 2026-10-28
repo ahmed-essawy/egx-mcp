@@ -8,6 +8,8 @@ const NOW = 1_792_000_000;
 const NEW_USER_WORST_CASE_ROWS = 4;
 const IDENTITY = { sub: "google-sub-1", email: "user@example.com", name: null };
 
+const TWO_SIGN_INS_ROWS = NEW_USER_WORST_CASE_ROWS * 2;
+
 describe("signInGoogleUser", () => {
   let env: Env;
   let sqlite: DatabaseSync;
@@ -34,8 +36,8 @@ describe("signInGoogleUser", () => {
   });
 
   it("returns the same id for a returning user", async () => {
-    const first = await signInGoogleUser(env, config(NEW_USER_WORST_CASE_ROWS), IDENTITY, NOW);
-    const second = await signInGoogleUser(env, config(NEW_USER_WORST_CASE_ROWS), IDENTITY, NOW);
+    const first = await signInGoogleUser(env, config(TWO_SIGN_INS_ROWS), IDENTITY, NOW);
+    const second = await signInGoogleUser(env, config(TWO_SIGN_INS_ROWS), IDENTITY, NOW);
 
     expect(second).toEqual(first);
     expect(userCount()).toBe(1);
@@ -49,10 +51,10 @@ describe("signInGoogleUser", () => {
   });
 
   it("returns deleted for a soft-deleted account", async () => {
-    await signInGoogleUser(env, config(NEW_USER_WORST_CASE_ROWS), IDENTITY, NOW);
+    await signInGoogleUser(env, config(TWO_SIGN_INS_ROWS), IDENTITY, NOW);
     sqlite.prepare("UPDATE users SET deleted_at = ?1 WHERE google_sub = ?2").run(NOW, IDENTITY.sub);
 
-    const result = await signInGoogleUser(env, config(NEW_USER_WORST_CASE_ROWS), IDENTITY, NOW);
+    const result = await signInGoogleUser(env, config(TWO_SIGN_INS_ROWS), IDENTITY, NOW);
 
     expect(result).toEqual({ kind: "deleted" });
   });

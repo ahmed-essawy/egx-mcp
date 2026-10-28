@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { toCairoIso } from "../../src/domain/calendar";
 import { NOTICE } from "../../src/mcp/envelope";
+import { TOOL_NAMES } from "../../src/mcp/tool-names";
 import type { Directory, Snapshot, Stats } from "../../src/store/kv";
 import { callNodeTool, createNodeStores, listNodeTools, NODE_AUTH, putJson, type NodeStores } from "../helpers/node-mcp";
 import { defaultSnapshot } from "../helpers/snapshot-fixture";
@@ -20,7 +21,8 @@ const SECOND_ISIN = "EGS69101C011";
 const FUND_ID = "fund-1";
 const SECOND_FUND_ID = "fund-2";
 const ERROR_CODES = ["unauthorized", "rate_limited", "capacity", "not_found", "ambiguous", "invalid_input", "not_available", "forbidden"];
-const NO_MARKET_VALUE_TOOLS = ["portfolio_upsert_holding", "portfolio_remove_holding", "price_level_set", "price_level_remove", "price_levels_list", "admin"];
+const WRITE_TOOLS = ["portfolio_upsert_holding", "portfolio_remove_holding", "price_level_set", "price_level_remove", "admin"];
+const NO_MARKET_VALUE_TOOLS = [...WRITE_TOOLS, "price_levels_list"];
 const ADVICE_WORDS = /\b(buy|sell|hold|recommend\w*)\b/i;
 const MISSING_ID = 999_999;
 
@@ -250,6 +252,17 @@ describe("all tools contract guard", () => {
       expect(tool.description, tool.name).toContain(NOTICE);
       expect(tool.outputSchema?.properties?.meta?.required, tool.name).toContain("provenance");
     }
+  });
+
+  it("lists exactly the tool names of TOOL_NAMES", async () => {
+    const tools = await listNodeTools(createNodeStores().env);
+    expect(tools.map((tool) => tool.name).sort()).toEqual([...TOOL_NAMES].sort());
+  });
+
+  it("marks every tool read only except the write tools", async () => {
+    const tools = await listNodeTools(createNodeStores().env);
+    const readOnly = tools.filter((tool) => tool.annotations?.readOnlyHint === true).map((tool) => tool.name);
+    expect(readOnly.sort()).toEqual(TOOL_NAMES.filter((name) => !WRITE_TOOLS.includes(name)).sort());
   });
 
   for (const state of STATES) {

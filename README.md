@@ -4,7 +4,7 @@ An MCP (Model Context Protocol) server that gives AI assistants read access to E
 
 Status: the MVP runs at <https://egx-mcp.essawy.workers.dev/> (see also the [privacy policy](https://egx-mcp.essawy.workers.dev/privacy) and the [terms of use](https://egx-mcp.essawy.workers.dev/terms)), and no permission from EGX or EGID to share the data has been obtained yet. See [Data sources and limits](#data-sources-and-limits).
 
-Current build: 30 tools are enabled (`search`, `get_quotes`, `get_market_overview`, `get_indices`, `get_index_history`, `get_index_summary`, `get_price_history`, `compare_symbols`, `get_movers`, `get_52_week_range`, `get_sector_performance`, `get_daily_summary`, `get_fund`, `get_fund_history`, `compare_funds`, `get_real_return`, `get_company_profile`, `get_dividends`, `get_corporate_actions`, `get_financials`, `get_metals`, `get_usd_egp`, `portfolio_get`, `portfolio_upsert_holding`, `portfolio_remove_holding`, `price_level_set`, `price_level_remove`, `price_levels_list`, `what_changed_since` and `admin`). You can connect with an API key from the dashboard or sign in with Google from Claude and ChatGPT. The `admin` tool is for the owner only. Parts of this guide that describe later work are marked "(coming later)".
+Current build: 30 tools are enabled (`search`, `get_quotes`, `get_market_overview`, `get_indices`, `get_index_history`, `get_index_summary`, `get_price_history`, `compare_symbols`, `get_movers`, `get_52_week_range`, `get_sector_performance`, `get_daily_summary`, `get_fund`, `get_fund_history`, `compare_funds`, `get_real_return`, `get_company_profile`, `get_dividends`, `get_corporate_actions`, `get_financials`, `get_metals`, `get_usd_egp`, `portfolio_get`, `portfolio_upsert_holding`, `portfolio_remove_holding`, `price_level_set`, `price_level_remove`, `price_levels_list`, `what_changed_since` and `admin`). You can connect with an API key from the dashboard or sign in with Google from Claude and ChatGPT. The `admin` tool is for the owner only. The only part of this guide that describes later work is the `egx` stock source, marked "(coming later)".
 
 ## Overview
 
@@ -41,7 +41,7 @@ Important notice:
 
 The order of stock sources is the `STOCK_PROVIDERS` setting (default `tradingview,mubasher`): TradingView is the primary source and Mubasher the backup. When TradingView fails, returns nothing or returns old data, Mubasher serves, the answer names the source actually used and a `source_switched` notice is raised. The `egx` source is accepted by the setting but is not built yet (coming later) and this build ignores it.
 
-Known gaps (from the research notes, R3). These return `not_available` with a reason until a source is found (investor statistics and EGX30 in USD already do; the others once their tools are built):
+Known gaps (from the research notes, R3). These are reported as not available, or labeled, until a source is found:
 
 - Investor statistics by investor type (only the EGX website has them).
 - EGX30 in USD.
@@ -107,7 +107,7 @@ If a client reports `unauthorized` after you revoke a key, wait up to 2 minutes 
 
 ## Tools
 
-This build enables `search`, `get_quotes`, `get_market_overview`, `get_indices`, `get_index_history`, `get_index_summary`, `get_price_history`, `compare_symbols`, `get_movers`, `get_52_week_range`, `get_sector_performance`, `get_daily_summary`, `get_fund`, `get_fund_history`, `compare_funds`, `get_real_return`, `get_company_profile`, `get_dividends`, `get_corporate_actions`, `get_financials`, `get_metals`, `get_usd_egp`, `portfolio_get`, `portfolio_upsert_holding`, `portfolio_remove_holding`, `price_level_set`, `price_level_remove`, `price_levels_list`, `what_changed_since` and `admin`.
+The server provides 30 tools: `search`, `get_quotes`, `get_market_overview`, `get_indices`, `get_index_history`, `get_index_summary`, `get_price_history`, `compare_symbols`, `get_movers`, `get_52_week_range`, `get_sector_performance`, `get_daily_summary`, `get_fund`, `get_fund_history`, `compare_funds`, `get_real_return`, `get_company_profile`, `get_dividends`, `get_corporate_actions`, `get_financials`, `get_metals`, `get_usd_egp`, `portfolio_get`, `portfolio_upsert_holding`, `portfolio_remove_holding`, `price_level_set`, `price_level_remove`, `price_levels_list`, `what_changed_since` and `admin`.
 
 Symbols can be given as a ticker, an ISIN, or an Arabic or English name. Index names accept the short aliases `EGX70` (meaning `EGX70EWI`) and `EGX100` (meaning `EGX100EWI`).
 
@@ -153,9 +153,9 @@ Portfolio and price level data belongs to the signed-in user only. The `admin` t
 The service runs only on free hosting with no payment method, so reaching a limit causes a refusal, never a bill.
 
 - Per user (shared by all of that user's API keys and sign-ins): 100 calls per day (`USER_DAILY_CALLS`) and 10 calls per minute.
-- Global daily cap for all users together: 15,000 calls per day (`GLOBAL_DAILY_CALLS`), plus a cap on database rows read (a cap on sign-in storage writes). When a cap is reached, calls are refused until 00:00 UTC, even for users on the unlimited list.
+- Global daily cap for all users together: 15,000 calls per day (`GLOBAL_DAILY_CALLS`), plus a cap on database rows read. When a cap is reached, calls are refused until 00:00 UTC, even for users on the unlimited list.
 - Users whose Google email is in `UNLIMITED_EMAILS` skip the per-user limits, but not the global caps.
-- Sign-ups are also protected: when the daily sign-in storage budget is used up, new sign-ins get a `503` with a `Retry-After` header until 00:00 UTC.
+- Sign-ups are also protected by the OAuth guard: sign-in storage writes are capped at 600 per day (`OAUTH_DAILY_KV_WRITES`, about 100 first sign-ins per day). When that budget is used up, new sign-ins get a `503` with a `Retry-After` header until 00:00 UTC.
 
 Retry messages tell you when to try again:
 
@@ -210,8 +210,8 @@ Steps (run them in a terminal in the cloned folder):
    ```
 
 9. Check the project: `npm run typecheck` and `npm test`.
-10. Run it locally: `npm run dev`. To trigger a job by hand while it runs, open `http://localhost:8787/__scheduled?cron=<cron with spaces as +>`. The snapshot job is `cron=*+6-13+*+*+SUN-THU`. It writes data only during the Cairo session window (09:55 to 14:45, Sunday to Thursday), and it needs the symbol list, which only the end-of-day job writes. So run the end-of-day job first, with `cron=30+12,13,14+*+*+SUN-THU`, on a trading day at 15:30 Cairo time or later. For local sign-in, put the secrets and `PUBLIC_ORIGIN=http://localhost:8787` in a `.dev.vars` file (it is not committed). Without `PUBLIC_ORIGIN` the dashboard is unavailable.
-11. Load the historical data. This needs at least one end-of-day run first so that the symbols exist. Validate first, then load corporate actions, then the prices, and re-run the last command on later days until it finishes (a daily row budget limits how much is loaded per day):
+10. Run it locally: `npm run dev`. To trigger a job by hand while it runs, open `http://localhost:8787/__scheduled?cron=<cron with spaces as +>`. The snapshot job is `cron=*+6-13+*+*+SUN-THU`. It writes data only during the Cairo session window (09:55 to 14:45, Sunday to Thursday), and on a fresh install its first tick builds the symbol list (the listing bootstrap) before it writes quotes. So trigger it on a trading day inside the window, and quotes appear from that first in-window tick. The end-of-day job (`cron=30+12,13,14+*+*+SUN-THU`, 15:30 Cairo time or later) also builds the symbol list. For local sign-in, put the secrets and `PUBLIC_ORIGIN=http://localhost:8787` in a `.dev.vars` file (it is not committed). Without `PUBLIC_ORIGIN` the dashboard is unavailable.
+11. Load the historical data. This needs the symbols to exist, which one snapshot tick or one end-of-day run provides. Validate first, then load corporate actions, then the prices, and re-run the last command on later days until it finishes (a daily row budget limits how much is loaded per day):
 
     ```text
     npm run backfill -- --validate
@@ -221,7 +221,7 @@ Steps (run them in a terminal in the cloned folder):
 
     The `--validate` run compares the newest stored close of each symbol with the source file and lists symbols that differ by more than 0.5 percent; only the symbols that pass are loaded. Importing a file locks the database, so loading actions and prices refuses to run during the EGX session (Sunday to Thursday, 10:00 to 14:30 Cairo time); run it after 14:30, or pass `--during-session` to run it anyway.
 12. Deploy: `npm run deploy`. Wrangler prints the Worker address. Put it in `PUBLIC_ORIGIN`, add its two redirect URIs to the Google OAuth client, and run `npm run deploy` again.
-13. Make the first tool call: open `<PUBLIC_ORIGIN>/dashboard`, sign in, create a key, connect a client as described above and ask "What is the price of CIB?". On a fresh deploy there are no quotes yet: the first end-of-day run (15:30 Cairo time or later on a trading day) builds the symbol list, and quotes appear from the snapshot job of the next session.
+13. Make the first tool call: open `<PUBLIC_ORIGIN>/dashboard`, sign in, create a key, connect a client as described above and ask "What is the price of CIB?". On a fresh deploy the first snapshot tick on a trading day builds the symbol list, and quotes appear from the first tick inside the session window.
 
 Holiday table maintenance: the server skips dates marked as holidays and uses special hours (for example Ramadan) from a table you maintain. Ask the `admin` tool, for example:
 

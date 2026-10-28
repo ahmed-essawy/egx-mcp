@@ -20,13 +20,13 @@ export const NODE_AUTH: AuthProps = {
   scopes: ["mcp:write"],
 };
 
-export type NodeStores = { env: Env; sqlite: DatabaseSync; kv: Map<string, string> };
+export type NodeStores = { env: Env; sqlite: DatabaseSync; kv: Map<string, string>; rowsWritten: () => number; rowsWrittenTo: (table: string) => number };
 
 export type ListedTool = { name: string; description?: string; annotations?: { readOnlyHint?: boolean } };
 
 type RpcResponse = { id?: number; result?: unknown; error?: { code: number; message: string } };
 
-function varsOfWrangler(): Record<string, string> {
+export function varsOfWrangler(): Record<string, string> {
   return (JSON.parse(wrangler) as { vars: Record<string, string> }).vars;
 }
 
@@ -45,8 +45,8 @@ function createKv(kv: Map<string, string>): KVNamespace {
   } as unknown as KVNamespace;
 }
 
-export function createNodeStores(): NodeStores {
-  const { db, sqlite } = createSqliteD1();
+export function createNodeStores(overrides: Record<string, string> = {}): NodeStores {
+  const { db, sqlite, rowsWritten, rowsWrittenTo } = createSqliteD1();
   const kv = new Map<string, string>();
   sqlite
     .prepare("INSERT INTO users (id, google_sub, email, created_at) VALUES (?1, ?2, ?3, ?4)")
@@ -54,12 +54,13 @@ export function createNodeStores(): NodeStores {
   const env = {
     ...varsOfWrangler(),
     PUBLIC_ORIGIN: "",
+    ...overrides,
     DB: db,
     DATA: createKv(kv),
     RATE_LIMITER: { limit: async () => ({ success: true }) },
   } as unknown as Env;
   __resetKvMemo();
-  return { env, sqlite, kv };
+  return { env, sqlite, kv, rowsWritten, rowsWrittenTo };
 }
 
 export function putJson(stores: NodeStores, key: string, value: unknown): void {

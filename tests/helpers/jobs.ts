@@ -1,6 +1,8 @@
 import { env } from "cloudflare:test";
 import { getJobState } from "../../src/store/d1/jobs";
 import { __resetKvMemo, type Directory } from "../../src/store/kv";
+import { bindMember } from "./bind";
+import { requestUrl } from "./request";
 import { DIRECTORY_KEY, setNow } from "./seed";
 import { cairoSummerEpoch } from "./time";
 
@@ -23,14 +25,9 @@ export const failingUpstream: Upstream = () => {
 };
 export const notFound: Upstream = () => new Response("not found", { status: 404 });
 
-export function requestUrl(input: RequestInfo | URL): string {
-  return input instanceof Request ? input.url : String(input);
-}
+export { requestUrl };
 
-export function bindMember(target: object, property: string | symbol): unknown {
-  const member = Reflect.get(target, property);
-  return typeof member === "function" ? member.bind(target) : member;
-}
+export { bindMember };
 
 export function instrumentEnv() {
   const statements: string[] = [];
