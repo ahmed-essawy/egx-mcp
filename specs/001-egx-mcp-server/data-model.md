@@ -209,3 +209,5 @@ Rules: keyed by ISIN; `td` is the trade date reported by the source and drives f
 
 ### `stats:v1` shape
 `{ "v": 1, "asOf": "2026-10-23", "symbols": { "<isin>": { "h52": 0, "h52d": "", "l52": 0, "l52d": "", "avgVol20": 0, "ret": { "1d": 0, "1w": 0, "1m": 0, "3m": 0, "ytd": 0, "1y": 0 }, "pendingAdj": [ { "actionId": 0, "kind": "bonus", "exDate": "", "state": "needs_ratio", "adjAffected": true } ] } } }`
+
+The `ret` values are percent, so `3.2` means +3.2%; a period without a base bar is `null`.

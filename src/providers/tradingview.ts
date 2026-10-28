@@ -3,6 +3,7 @@ import { TRADINGVIEW_INDEX_TICKERS } from "../domain/indices";
 import { fetchJson } from "./http";
 import {
   ProviderError,
+  type DailyClose,
   type FxProvider,
   type GlobalMetalsProvider,
   type IndexProvider,
@@ -26,6 +27,7 @@ const GOLD_NAME = "GOLD";
 const SILVER_NAME = "SILVER";
 export const EMPTY_USD_EGP = "scan response has no USDEGP row";
 export const EMPTY_SPOT = "scan response has no spot metal rows";
+const CLOSE_COLUMNS = ["name", "close", "time", "type"];
 const SCAN_RANGE = [0, 400];
 const STOCK_TYPE = "stock";
 const LISTING_MARKET = "main";
@@ -84,13 +86,25 @@ function parseRows(body: unknown): ScanRow[] {
     .filter((row) => row.type === STOCK_TYPE);
 }
 
-async function fetchScan(): Promise<ScanRow[]> {
-  const body = await fetchJson(PROVIDER_ID, SCAN_URL, {
+async function postScan(columns: readonly string[]): Promise<unknown> {
+  return fetchJson(PROVIDER_ID, SCAN_URL, {
     method: "POST",
     headers: { "content-type": "application/json" },
-    body: JSON.stringify({ columns: COLUMNS, range: SCAN_RANGE }),
+    body: JSON.stringify({ columns, range: SCAN_RANGE }),
   });
-  return parseRows(body);
+}
+
+async function fetchScan(): Promise<ScanRow[]> {
+  return parseRows(await postScan(COLUMNS));
+}
+
+function toDailyClose(values: unknown[]): [string, DailyClose] | null {
+  const [name, close, time, type] = values;
+  const ticker = asString(name);
+  const last = asNumber(close);
+  const seconds = asNumber(time);
+  if (type !== STOCK_TYPE || ticker === null || last === null || seconds === null) return null;
+  return [ticker, { close: last, tradeDate: cairoParts(seconds).date }];
 }
 
 function toQuote(row: ScanRow): ProviderQuote | null {
@@ -141,6 +155,11 @@ export const tradingViewStocks: StockQuoteProvider & ListingProvider = {
     return (await fetchScan()).map(toListing).filter(isPresent);
   },
 };
+
+export async function tradingViewDailyCloses(): Promise<Map<string, DailyClose>> {
+  const body = await postScan(CLOSE_COLUMNS);
+  return new Map(scanRows(body).map(toDailyClose).filter(isPresent));
+}
 
 function toIndex(values: unknown[], wanted: ReadonlySet<string>): ProviderIndex | null {
   const [name, close, change, updateTime] = values;

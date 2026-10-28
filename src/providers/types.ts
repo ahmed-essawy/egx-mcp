@@ -139,3 +139,8 @@ export interface FundamentalsProvider {
   id: string;
   fetchFundamentals(): Promise<ProviderFundamentals[]>;
 }
+
+export interface DailyClose {
+  close: number;
+  tradeDate: string;
+}

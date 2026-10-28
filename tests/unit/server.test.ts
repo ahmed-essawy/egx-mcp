@@ -212,6 +212,9 @@ describe("createServer", () => {
       "get_market_overview",
       "get_indices",
       "get_daily_summary",
+      "get_movers",
+      "get_52_week_range",
+      "get_sector_performance",
       "get_metals",
       "get_usd_egp",
       "portfolio_get",
@@ -221,6 +224,8 @@ describe("createServer", () => {
       "price_level_remove",
       "price_levels_list",
       "what_changed_since",
+      "get_price_history",
+      "compare_symbols",
     ]);
   });
 });

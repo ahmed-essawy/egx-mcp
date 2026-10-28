@@ -2,6 +2,7 @@ import { cairoParts } from "../domain/calendar";
 import { fetchJson } from "./http";
 import {
   ProviderError,
+  type DailyClose,
   type ListingProvider,
   type ProviderListing,
   type ProviderQuote,
@@ -86,15 +87,28 @@ async function fetchListingPage(page: number): Promise<{ rows: Row[]; pageCount:
   return { rows: asRows(body?.rows, "rows"), pageCount: asNumber(body?.numberOfPages) ?? FIRST_PAGE };
 }
 
+async function fetchPriceRows(): Promise<Row[]> {
+  const body = (await fetchJson(PROVIDER_ID, PRICES_URL)) as { prices?: unknown } | null;
+  const rows = asRows(body?.prices, "prices");
+  if (rows.length === 0) throw new ProviderError(PROVIDER_ID, "empty", "response has no prices");
+  return rows;
+}
+
+function toDailyClose(row: Row): [string, DailyClose] | null {
+  const quote = toQuote(row);
+  return quote === null ? null : [quote.ticker, { close: quote.last, tradeDate: quote.tradeDate }];
+}
+
 export const mubasherStocks: StockQuoteProvider = {
   id: PROVIDER_ID,
   async fetchQuotes() {
-    const body = (await fetchJson(PROVIDER_ID, PRICES_URL)) as { prices?: unknown } | null;
-    const rows = asRows(body?.prices, "prices");
-    if (rows.length === 0) throw new ProviderError(PROVIDER_ID, "empty", "response has no prices");
-    return rows.map(toQuote).filter(isPresent);
+    return (await fetchPriceRows()).map(toQuote).filter(isPresent);
   },
 };
+
+export async function mubasherDailyCloses(): Promise<Map<string, DailyClose>> {
+  return new Map((await fetchPriceRows()).map(toDailyClose).filter(isPresent));
+}
 
 export const mubasherListings: ListingProvider = {
   id: PROVIDER_ID,

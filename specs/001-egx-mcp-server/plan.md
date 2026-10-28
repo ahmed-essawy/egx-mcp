@@ -148,6 +148,8 @@ src/
 │   ├── arabic.ts              normalizeArabic
 │   ├── indices.ts             index codes, names, input aliases
 │   ├── adjust.ts              adjustment factors, CSV parsing, backfill row values
+│   ├── stats.ts               52-week range, average volume and period returns for stats:v1
+│   ├── session-quotes.ts      quotes whose trade date is the snapshot session date
 │   ├── budget.ts              D1 rows-written reserves, accounting rows per call, adjust batch overhead, backfillAllowance
 │   ├── returns.ts             period returns, real return
 │   ├── freshness.ts           stale rules
