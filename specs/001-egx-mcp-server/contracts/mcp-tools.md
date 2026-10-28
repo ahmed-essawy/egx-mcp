@@ -45,7 +45,7 @@ Rules: `meta` is present on every market data response (FR-007, SC-002). Per-ite
 | `get_company_profile` | `symbol` | `{ isin, ticker, nameAr, nameEn, sector, market, sharesOutstanding, freeFloatShares, firstTradeDate, indexCodes, status }`; while no source gives them, `meta.notAvailable` lists `listingDate` and `indexMembership` (`indexCodes` is `[]`) | D1 |
 | `get_dividends` | `symbol` optional, `from`, `to` (default today to +90 days) | `items[]`: `{ isin, ticker, kind, exDate, announcedOn, amount, currency, ratio, status, source }` | D1 |
 | `get_corporate_actions` | `symbol`, `from` optional | same item shape, all kinds | D1 |
-| `get_financials` | `symbol` | `{ figures[]: { metric, periodType, periodEnd, value, currency, source }, missing[], ratios{ pe, pb, dividendYield } each `{ value, inputs }` or `{ status: "not_computable", reason }` }` | D1 + snapshot |
+| `get_financials` | `symbol` | `{ figures[]: { metric, periodType, periodEnd (string or null), value, currency, source }, missing[], ratios{ pe, pb, dividendYield } each `{ value, inputs }` or `{ status: "not_computable", reason }` }` | D1 + snapshot |
 | `get_metals` | none | `{ egypt: { gold18k, gold21k, gold24k, silver925, silver999 } each `{ buy, sell, unit: "EGP/g", dataTime, dataTimeKind: "fetched", source }` or not_available, global: { XAUUSD, XAGUSD } each `{ value, unit: "USD/oz", dataTime, source }` }` | snapshot |
 | `get_usd_egp` | none | `{ rate, kind: "market", dataTime, source }` (the only source in the first release is the TradingView market rate) | snapshot |
 
@@ -53,7 +53,7 @@ Pending adjustment (owner decision Q1a; rules in [data-model.md](../data-model.m
 
 Session status: tools report `snapshot.session.status` when `session.noTradesToday` is true (a holiday missing from the calendar is reported as `closed`); otherwise the status comes from the calendar and the clock.
 
-Ratios (FR-031, constitution III): P/E = price / EPS (TTM), P/B = price / (total equity / shares outstanding), dividend yield = sum of cash dividends with ex date in the last 365 days / price. Computed by the server; never copied from a provider.
+Ratios (FR-031, constitution III): P/E = price / EPS (TTM), P/B = price / (total equity / shares outstanding), dividend yield = sum of cash dividends with ex date in the last 365 days / price. Computed by the server; never copied from a provider. A ratio is `not_computable` with `reason` "figure currency X differs from price currency Y" when its EPS or equity currency is not the price currency, which is the symbol's quote currency (`symbols.quote_currency`, EGP by default); the yield sums only dividends in that currency and is `not_computable` ("N cash dividend(s) in the last 365 days have no amount yet") when a cash dividend of the window has no amount. `get_financials` returns a figure with no source period end with `periodEnd: null` and adds `{ field: "periodEnd", reason }` to `meta.notAvailable`.
 
 ## Personal tools (data scoped to the caller, FR-035)
 

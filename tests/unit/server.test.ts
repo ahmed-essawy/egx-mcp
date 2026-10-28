@@ -226,6 +226,14 @@ describe("createServer", () => {
       "what_changed_since",
       "get_price_history",
       "compare_symbols",
+      "get_fund",
+      "get_fund_history",
+      "compare_funds",
+      "get_real_return",
+      "get_company_profile",
+      "get_dividends",
+      "get_corporate_actions",
+      "get_financials",
     ]);
   });
 });

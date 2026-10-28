@@ -34,6 +34,7 @@ export type NewApiKey = {
 export type GoogleProfile = { sub: string; email: string; name: string | null };
 
 export type WriteResult = { rowsWritten: number };
+export type ReadResult<T> = { value: T; rowsRead: number };
 export type TouchResult = WriteResult & { rowsRead: number };
 
 type UserRow = {

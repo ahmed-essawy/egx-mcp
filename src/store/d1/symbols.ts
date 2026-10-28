@@ -1,5 +1,5 @@
 import type { SymbolStatus } from "../kv";
-import type { WriteResult } from "./users";
+import type { ReadResult, WriteResult } from "./users";
 
 export type ListingRow = {
   isin: string;
@@ -41,6 +41,7 @@ export type SymbolProfile = {
   adjBasisDate: string | null;
   backfillState: "loading" | "done" | null;
   missingSessions: number;
+  quoteCurrency: string;
   createdAt: number;
   updatedAt: number;
 };
@@ -70,6 +71,7 @@ type SymbolProfileRecord = {
   adj_basis_date: string | null;
   backfill_state: "loading" | "done" | null;
   missing_sessions: number;
+  quote_currency: string;
   created_at: number;
   updated_at: number;
 };
@@ -179,18 +181,20 @@ export async function setStatus(
   return { rowsWritten: meta.rows_written };
 }
 
-export async function getProfile(db: D1Database, isin: string): Promise<SymbolProfile | null> {
-  const row = await db
+export async function getProfile(db: D1Database, isin: string): Promise<ReadResult<SymbolProfile | null>> {
+  const { results, meta } = await db
     .prepare(
       `SELECT isin, ticker, name_ar, name_en, sector, market, index_codes, status, shares_outstanding,
               free_float_shares, first_trade_date, adj_basis_date, backfill_state, missing_sessions,
-              created_at, updated_at
+              quote_currency, created_at, updated_at
        FROM symbols WHERE isin = ?1`,
     )
     .bind(isin)
-    .first<SymbolProfileRecord>();
-  if (!row) return null;
-  return {
+    .all<SymbolProfileRecord>();
+  const row = results[0];
+  const rowsRead = meta.rows_read ?? 0;
+  if (!row) return { value: null, rowsRead };
+  const profile: SymbolProfile = {
     isin: row.isin,
     ticker: row.ticker,
     nameAr: row.name_ar,
@@ -205,7 +209,9 @@ export async function getProfile(db: D1Database, isin: string): Promise<SymbolPr
     adjBasisDate: row.adj_basis_date,
     backfillState: row.backfill_state,
     missingSessions: row.missing_sessions,
+    quoteCurrency: row.quote_currency,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
+  return { value: profile, rowsRead };
 }

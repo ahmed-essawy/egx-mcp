@@ -55,6 +55,8 @@ Result: **PASS** for the design with every round 3 in-scope finding fixed. The o
 
 ## Known open items
 
+Amendment (stream B review round 1, T098): shares outstanding and free float are sourced by the listing sync (T049, T051) through `upsertListings`; the fundamentals step does not write them, and P/B uses `symbols.shares_outstanding`.
+
 From analyze round 3, out of scope for the planning fix round by owner decision; each is handled by the code review of the task that touches it.
 
 - C19: backfill resume and rerun across a new CSV version of the same symbol.
@@ -69,6 +71,7 @@ From analyze round 3, out of scope for the planning fix round by owner decision;
 - C29: consumers of the R1 rows-read budget.
 - B5: no notice for a symbol stuck in the `loading` backfill state.
 - C31: CPU fallback for the end-of-day job.
+- B-1: shares outstanding for P/B come from the listing sync, not the fundamentals step (amendment above); a listing with no TradingView share count leaves P/B not computable.
 - G1: T068 needs a case that forces a statement of the apply batch to fail and asserts no row is left in `adjusting` and nothing was written.
 
 ## Project Structure

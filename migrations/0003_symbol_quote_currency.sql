@@ -1,0 +1,1 @@
+ALTER TABLE symbols ADD COLUMN quote_currency TEXT NOT NULL DEFAULT 'EGP';

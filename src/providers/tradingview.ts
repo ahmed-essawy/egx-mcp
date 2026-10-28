@@ -1,4 +1,5 @@
 import { cairoParts } from "../domain/calendar";
+import type { FigureMetricName } from "../domain/figures";
 import { TRADINGVIEW_INDEX_TICKERS } from "../domain/indices";
 import { fetchJson } from "./http";
 import {
@@ -6,8 +7,11 @@ import {
   type DailyClose,
   type FxProvider,
   type GlobalMetalsProvider,
+  type FundamentalsProvider,
   type IndexProvider,
   type ListingProvider,
+  type ProviderFigure,
+  type ProviderFundamentals,
   type ProviderIndex,
   type ProviderListing,
   type ProviderQuote,
@@ -28,6 +32,31 @@ const SILVER_NAME = "SILVER";
 export const EMPTY_USD_EGP = "scan response has no USDEGP row";
 export const EMPTY_SPOT = "scan response has no spot metal rows";
 const CLOSE_COLUMNS = ["name", "close", "time", "type"];
+const FUNDAMENTALS_COLUMNS = [
+  "name",
+  "isin",
+  "total_revenue_fy",
+  "net_income_fy",
+  "total_equity_fq",
+  "total_debt_fq",
+  "earnings_per_share_basic_ttm",
+  "dps_common_stock_prim_issue_fy",
+  "dividend_amount_recent",
+  "ex_dividend_date_recent",
+  "ex_dividend_date_upcoming",
+  "fiscal_period_end",
+  "currency",
+  "fundamental_currency_code",
+] as const;
+const FIGURE_METRICS: readonly { column: FundamentalsColumn; metric: FigureMetricName; periodType: string }[] = [
+  { column: "total_revenue_fy", metric: "revenue", periodType: "FY" },
+  { column: "net_income_fy", metric: "net_income", periodType: "FY" },
+  { column: "total_equity_fq", metric: "total_equity", periodType: "FQ" },
+  { column: "total_debt_fq", metric: "total_debt", periodType: "FQ" },
+  { column: "earnings_per_share_basic_ttm", metric: "eps_basic", periodType: "TTM" },
+  { column: "dps_common_stock_prim_issue_fy", metric: "dps", periodType: "FY" },
+];
+const FISCAL_YEAR_PERIOD = "FY";
 const SCAN_RANGE = [0, 400];
 const STOCK_TYPE = "stock";
 const LISTING_MARKET = "main";
@@ -56,6 +85,8 @@ const COLUMNS = [
 
 type Column = (typeof COLUMNS)[number];
 type ScanRow = Record<Column, unknown>;
+type FundamentalsColumn = (typeof FUNDAMENTALS_COLUMNS)[number];
+type FundamentalsRow = Record<FundamentalsColumn, unknown>;
 
 function asNumber(value: unknown): number | null {
   return typeof value === "number" && Number.isFinite(value) ? value : null;
@@ -226,5 +257,54 @@ export const tradingViewFxMetals: FxProvider & GlobalMetalsProvider = {
     const { spot } = await fetchFxMetals();
     if (spot.XAUUSD === null && spot.XAGUSD === null) throw new ProviderError(PROVIDER_ID, "empty", EMPTY_SPOT);
     return spot;
+  },
+};
+
+function toFundamentalsRow(values: unknown[]): FundamentalsRow {
+  return Object.fromEntries(FUNDAMENTALS_COLUMNS.map((column, index) => [column, values[index]])) as FundamentalsRow;
+}
+
+function cairoDate(seconds: unknown): string | null {
+  const value = asNumber(seconds);
+  return value === null ? null : cairoParts(value).date;
+}
+
+function toFigures(row: FundamentalsRow, currency: string): ProviderFigure[] {
+  const latestPeriodEnd = cairoDate(row.fiscal_period_end);
+  return FIGURE_METRICS.flatMap(({ column, metric, periodType }) => {
+    const value = asNumber(row[column]);
+    const periodEnd = periodType === FISCAL_YEAR_PERIOD ? null : latestPeriodEnd;
+    return value === null ? [] : [{ metric, periodType, periodEnd, value, currency }];
+  });
+}
+
+function toFundamentals(row: FundamentalsRow): ProviderFundamentals | null {
+  const ticker = asString(row.name);
+  if (ticker === null) return null;
+  const quoteCurrency = asString(row.currency) ?? LISTING_CURRENCY;
+  const currency = asString(row.fundamental_currency_code) ?? quoteCurrency;
+  return {
+    ticker,
+    isin: asString(row.isin),
+    quoteCurrency,
+    figures: toFigures(row, currency),
+    dividend: {
+      recentAmount: asNumber(row.dividend_amount_recent),
+      recentExDate: cairoDate(row.ex_dividend_date_recent),
+      upcomingExDate: cairoDate(row.ex_dividend_date_upcoming),
+      currency,
+    },
+  };
+}
+
+export const tradingViewFundamentals: FundamentalsProvider = {
+  id: PROVIDER_ID,
+  async fetchFundamentals() {
+    const body = await fetchJson(PROVIDER_ID, SCAN_URL, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ columns: FUNDAMENTALS_COLUMNS, range: SCAN_RANGE }),
+    });
+    return scanRows(body).map(toFundamentalsRow).map(toFundamentals).filter(isPresent);
   },
 };

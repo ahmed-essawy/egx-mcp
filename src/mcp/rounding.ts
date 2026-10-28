@@ -18,6 +18,8 @@ export function roundPrice(value: number | null): number | null {
   return roundedOrNull(value, PRICE_DECIMALS);
 }
 
+export function roundPercent(value: number): number;
+export function roundPercent(value: number | null): number | null;
 export function roundPercent(value: number | null): number | null {
   return roundedOrNull(value, PERCENT_DECIMALS);
 }

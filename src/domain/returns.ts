@@ -1,3 +1,7 @@
+export const PERIODS = ["1m", "3m", "ytd", "1y"] as const;
+
+export type Period = (typeof PERIODS)[number];
+
 export type ReturnPeriod = "1d" | "1w" | "1m" | "3m" | "1y" | "ytd";
 
 const DAYS_PER_WEEK = 7;
@@ -6,6 +10,8 @@ const LAST_MONTH_INDEX = 11;
 const LAST_DAY_OF_YEAR = 31;
 const ISO_DATE_LENGTH = 10;
 const MIDDLE_DIVISOR = 2;
+const MONTH_LENGTH = 7;
+const PERCENT = 100;
 
 const MONTHS_BACK: Readonly<Record<"1m" | "3m" | "1y", number>> = {
   "1m": 1,
@@ -61,4 +67,16 @@ export function median(values: readonly number[]): number {
   const upperMiddle = Math.floor(sorted.length / MIDDLE_DIVISOR);
   const middleValues = sorted.slice(lowerMiddle, upperMiddle + 1);
   return middleValues.reduce((sum, value) => sum + value, 0) / middleValues.length;
+}
+
+export function percentChange(start: number, end: number): number {
+  return periodReturn(start, end) * PERCENT;
+}
+
+export function realReturnPct(nominalPct: number, inflationPct: number): number {
+  return realReturn(nominalPct / PERCENT, 1, 1 + inflationPct / PERCENT) * PERCENT;
+}
+
+export function monthOf(date: string): string {
+  return date.slice(0, MONTH_LENGTH);
 }

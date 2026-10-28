@@ -1,9 +1,15 @@
+import type { CorporateActionKind } from "../domain/adjust";
 import { cairoParts } from "../domain/calendar";
 import { fetchJson } from "./http";
 import {
   ProviderError,
   type DailyClose,
+  type FundFetch,
+  type CorporateActionProvider,
+  type FundNavProvider,
   type ListingProvider,
+  type ProviderAction,
+  type ProviderFund,
   type ProviderListing,
   type ProviderQuote,
   type StockQuoteProvider,
@@ -16,6 +22,39 @@ const LISTED_URL = "https://www.mubasher.info/api/1/listed-companies?country=eg"
 const MAX_LISTING_PAGES = 18;
 const FIRST_PAGE = 1;
 const LISTING_MARKET = "main";
+const FUNDS_URL = "https://www.mubasher.info/api/1/funds?country=eg";
+const MAX_FUND_PAGES = 13;
+const FUND_SOURCE_PREFIX = "mubasher:";
+const ACTIONS_URL = "https://www.mubasher.info/api/1/corporate-actions?country=eg";
+const SOURCE_TEXT_SEPARATOR = " | ";
+const ACTION_KIND_PREFIXES: ReadonlyArray<readonly [string, CorporateActionKind]> = [
+  ["توزيع أرباح نقدية", "cash_dividend"],
+  ["توزيع أسهم منحة", "bonus"],
+  ["توزيع أسهم خزينة كأسهم منحة", "bonus"],
+  ["تجزئة", "split"],
+  ["تجميع", "reverse_split"],
+  ["زيادة رأس مال", "rights"],
+  ["تغيير اسم الشركة", "name_change"],
+];
+const ARABIC_DATE = /^(\d{1,2})\s+(\S+)\s+(\d{4})$/;
+const ARABIC_MONTHS = [
+  "يناير",
+  "فبراير",
+  "مارس",
+  "أبريل",
+  "مايو",
+  "يونيو",
+  "يوليو",
+  "أغسطس",
+  "سبتمبر",
+  "أكتوبر",
+  "نوفمبر",
+  "ديسمبر",
+];
+const FUND_CURRENCIES: ReadonlyArray<readonly [string, string]> = [
+  ["جنيه", "EGP"],
+  ["دولار", "USD"],
+];
 const MS_PER_SECOND = 1000;
 const NUMBER_NOISE = /[,%]/g;
 
@@ -39,6 +78,41 @@ function parseUtcSeconds(value: unknown): number | null {
   if (text === null) return null;
   const milliseconds = Date.parse(`${text.replace(" ", "T")}Z`);
   return Number.isNaN(milliseconds) ? null : milliseconds / MS_PER_SECOND;
+}
+
+export function parseArabicDate(text: string): string | null {
+  const match = ARABIC_DATE.exec(text.trim());
+  if (match === null) return null;
+  const month = ARABIC_MONTHS.indexOf(match[2] as string) + 1;
+  if (month === 0) return null;
+  const day = Number(match[1]);
+  const year = Number(match[3]);
+  const probe = new Date(Date.UTC(year, month - 1, day));
+  if (probe.getUTCMonth() !== month - 1 || probe.getUTCDate() !== day) return null;
+  return `${match[3]}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+}
+
+export function mapMubasherActionKind(type: string): CorporateActionKind {
+  return ACTION_KIND_PREFIXES.find(([prefix]) => type.startsWith(prefix))?.[1] ?? "other";
+}
+
+function parseOptionalArabicDate(value: unknown): string | null {
+  const text = asString(value);
+  return text === null ? null : parseArabicDate(text);
+}
+
+export function parseMubasherActionRow(row: Row): ProviderAction | null {
+  const ticker = asString(row.url)?.split("/").pop();
+  const exDate = parseOptionalArabicDate(row.effectiveFrom);
+  if (ticker === undefined || ticker === "" || exDate === null) return null;
+  const type = asString(row.type) ?? "";
+  return {
+    ticker,
+    kind: mapMubasherActionKind(type),
+    announcedOn: parseOptionalArabicDate(row.announcedAt),
+    exDate,
+    sourceText: `${type}${SOURCE_TEXT_SEPARATOR}${asString(row.description) ?? ""}`,
+  };
 }
 
 function toQuote(row: Row): ProviderQuote | null {
@@ -79,12 +153,55 @@ function toListing(row: Row): ProviderListing | null {
   };
 }
 
-async function fetchListingPage(page: number): Promise<{ rows: Row[]; pageCount: number }> {
-  const body = (await fetchJson(PROVIDER_ID, `${LISTED_URL}&page=${page}`)) as {
+function toFundCurrency(value: unknown): string | null {
+  const text = asString(value);
+  if (text === null) return null;
+  return FUND_CURRENCIES.find(([marker]) => text.includes(marker))?.[1] ?? null;
+}
+
+function toFundManager(row: Row): string | null {
+  const managers = Array.isArray(row.managers) ? row.managers : [];
+  return asString(managers[0]) ?? asString(row.owner);
+}
+
+function toFund(row: Row): ProviderFund | null {
+  const fundId = asNumber(row.fundId);
+  const nameAr = asString(row.name);
+  const nav = asNumber(row.price);
+  const dateText = asString(row.date);
+  const navDate = dateText === null ? null : parseArabicDate(dateText);
+  if (fundId === null || nameAr === null || nav === null || nav <= 0 || navDate === null) return null;
+  return {
+    sourceId: `${FUND_SOURCE_PREFIX}${fundId}`,
+    nameAr,
+    nameEn: null,
+    manager: toFundManager(row),
+    currency: toFundCurrency(row.currency),
+    category: asString(row.classification),
+    nav,
+    navDate,
+  };
+}
+
+async function fetchPagedRows(url: string, page: number): Promise<{ rows: Row[]; pageCount: number }> {
+  const body = (await fetchJson(PROVIDER_ID, `${url}&page=${page}`)) as {
     rows?: unknown;
     numberOfPages?: unknown;
   } | null;
   return { rows: asRows(body?.rows, "rows"), pageCount: asNumber(body?.numberOfPages) ?? FIRST_PAGE };
+}
+
+async function fetchLaterFundPages(lastPage: number): Promise<{ rows: Row[]; failedPages: number[] }> {
+  const rows: Row[] = [];
+  const failedPages: number[] = [];
+  for (let page = FIRST_PAGE + 1; page <= lastPage; page += 1) {
+    try {
+      rows.push(...(await fetchPagedRows(FUNDS_URL, page)).rows);
+    } catch {
+      failedPages.push(page);
+    }
+  }
+  return { rows, failedPages };
 }
 
 async function fetchPriceRows(): Promise<Row[]> {
@@ -97,6 +214,11 @@ async function fetchPriceRows(): Promise<Row[]> {
 function toDailyClose(row: Row): [string, DailyClose] | null {
   const quote = toQuote(row);
   return quote === null ? null : [quote.ticker, { close: quote.last, tradeDate: quote.tradeDate }];
+}
+
+async function fetchActionRows(page: number): Promise<Row[]> {
+  const body = (await fetchJson(PROVIDER_ID, `${ACTIONS_URL}&page=${page}`)) as { rows?: unknown } | null;
+  return asRows(body?.rows, "rows");
 }
 
 export const mubasherStocks: StockQuoteProvider = {
@@ -113,13 +235,37 @@ export async function mubasherDailyCloses(): Promise<Map<string, DailyClose>> {
 export const mubasherListings: ListingProvider = {
   id: PROVIDER_ID,
   async fetchListings() {
-    const first = await fetchListingPage(FIRST_PAGE);
+    const first = await fetchPagedRows(LISTED_URL, FIRST_PAGE);
     if (first.rows.length === 0) throw new ProviderError(PROVIDER_ID, "empty", "response has no listings");
     const rows = [...first.rows];
     const lastPage = Math.min(first.pageCount, MAX_LISTING_PAGES);
     for (let page = FIRST_PAGE + 1; page <= lastPage; page += 1) {
-      rows.push(...(await fetchListingPage(page)).rows);
+      rows.push(...(await fetchPagedRows(LISTED_URL, page)).rows);
     }
     return rows.map(toListing).filter(isPresent);
+  },
+};
+
+export const mubasherFunds: FundNavProvider = {
+  id: PROVIDER_ID,
+  async fetchFunds(): Promise<FundFetch> {
+    const first = await fetchPagedRows(FUNDS_URL, FIRST_PAGE);
+    if (first.rows.length === 0) throw new ProviderError(PROVIDER_ID, "empty", "response has no funds");
+    const later = await fetchLaterFundPages(Math.min(first.pageCount, MAX_FUND_PAGES));
+    return {
+      funds: [...first.rows, ...later.rows].map(toFund).filter(isPresent),
+      failedPages: later.failedPages,
+    };
+  },
+};
+
+export const mubasherActions: CorporateActionProvider = {
+  id: PROVIDER_ID,
+  async fetchActions(pages) {
+    const rows: Row[] = [];
+    for (let page = FIRST_PAGE; page <= pages; page += 1) {
+      rows.push(...(await fetchActionRows(page)));
+    }
+    return rows.map(parseMubasherActionRow).filter(isPresent);
   },
 };

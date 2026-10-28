@@ -1,4 +1,5 @@
 import { cairoParts, SECONDS_PER_DAY, type CalendarRow } from "../../domain/calendar";
+import type { ReadResult } from "./users";
 
 const HOLIDAY_LOOKBACK_DAYS = 14;
 
@@ -27,4 +28,12 @@ export async function recentCalendar(db: D1Database, now: number): Promise<Recen
     holidays: new Set(results.filter((row) => row.kind === "holiday").map((row) => row.date)),
     rowsRead: meta.rows_read ?? 0,
   };
+}
+
+export async function holidaysBetween(db: D1Database, from: string, to: string): Promise<ReadResult<Set<string>>> {
+  const { results, meta } = await db
+    .prepare("SELECT date FROM market_calendar WHERE kind = 'holiday' AND date BETWEEN ?1 AND ?2")
+    .bind(from, to)
+    .all<{ date: string }>();
+  return { value: new Set(results.map((row) => row.date)), rowsRead: meta.rows_read ?? 0 };
 }

@@ -2,9 +2,11 @@ import type { CallToolResult } from "@modelcontextprotocol/server";
 import { z } from "zod";
 import { toCairoIso } from "../domain/calendar";
 import { isQuoteStale } from "../domain/freshness";
-import type { Directory, DirectorySymbol, QuoteEntry } from "../store/kv";
+import type { RowsCounter } from "../limits/usage";
+import type { ReadResult } from "../store/d1/users";
+import { getDirectory, type Directory, type DirectorySymbol, type QuoteEntry } from "../store/kv";
 import { fail } from "./envelope";
-import { resolveSymbol, type Resolution } from "./resolve";
+import { MAX_SYMBOL_INPUT_LENGTH, resolveSymbol, type Resolution } from "./resolve";
 import type { MarketClock } from "./session";
 
 export const DIRECTORY_MISSING_MESSAGE = "The symbol directory is not built yet.";
@@ -13,6 +15,10 @@ export const SNAPSHOT_MISSING_REASON = "snapshot not built yet";
 export const ADJUSTED_FIELD = "adjusted";
 export const NEEDS_RATIO_REASON = "not yet adjusted: awaiting the owner's ratio";
 export const QUEUED_REASON = "not yet adjusted: adjustment queued";
+export const RANGE_ORDER_MESSAGE = "from must not be after to.";
+
+export const symbolInputSchema = z.string().min(1).max(MAX_SYMBOL_INPUT_LENGTH);
+export const dateSchema = z.iso.date();
 
 export const identitySchema = z.object({
   isin: z.string(),
@@ -22,6 +28,12 @@ export const identitySchema = z.object({
 });
 
 export type Identity = z.infer<typeof identitySchema>;
+
+export async function counted<T>(rows: RowsCounter, read: Promise<ReadResult<T>>): Promise<T> {
+  const { value, rowsRead } = await read;
+  rows.add({ rows_read: rowsRead });
+  return value;
+}
 
 export function identityOf([isin, ticker, nameAr, nameEn]: DirectorySymbol): Identity {
   return { isin, ticker, nameEn, nameAr };
@@ -59,4 +71,16 @@ export function resolveEach(
     entries.push(resolution.entry);
   }
   return { entries };
+}
+
+export type Found<T> = { ok: true; value: T } | { ok: false; result: CallToolResult };
+
+export function found<T>(value: T): Found<T> {
+  return { ok: true, value };
+}
+
+export async function loadDirectory(env: Env): Promise<Found<Directory>> {
+  const directory = await getDirectory(env);
+  if (directory === null) return { ok: false, result: fail("not_available", DIRECTORY_MISSING_MESSAGE) };
+  return found(directory);
 }

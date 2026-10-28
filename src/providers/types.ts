@@ -97,9 +97,14 @@ export interface ProviderFund {
   navDate: string;
 }
 
+export interface FundFetch {
+  funds: ProviderFund[];
+  failedPages: number[];
+}
+
 export interface FundNavProvider {
   id: string;
-  fetchFunds(): Promise<ProviderFund[]>;
+  fetchFunds(): Promise<FundFetch>;
 }
 
 export interface ProviderAction {
@@ -126,6 +131,7 @@ export interface ProviderFigure {
 export interface ProviderFundamentals {
   ticker: string;
   isin: string | null;
+  quoteCurrency: string;
   figures: ProviderFigure[];
   dividend: {
     recentAmount: number | null;

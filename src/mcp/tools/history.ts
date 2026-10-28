@@ -15,15 +15,18 @@ import { getDirectory, type DirectorySymbol } from "../../store/kv";
 import { defineTool, type ToolContext } from "../define-tool";
 import { fail, ok, type Meta } from "../envelope";
 import { envelopeSchema } from "../output-schema";
-import { MAX_SYMBOL_INPUT_LENGTH, resolveSymbol } from "../resolve";
+import { resolveSymbol } from "../resolve";
 import { roundPercent, roundPrice } from "../rounding";
 import { loadMarketClock, sessionMeta, type MarketClock } from "../session";
 import {
   ADJUSTED_FIELD,
+  dateSchema,
   DIRECTORY_MISSING_MESSAGE,
   NEEDS_RATIO_REASON,
   QUEUED_REASON,
+  RANGE_ORDER_MESSAGE,
   resolveEach,
+  symbolInputSchema,
   unresolvedSymbol,
 } from "../shared";
 
@@ -40,12 +43,8 @@ const BACKFILL_CAUSE = "until the backfill of this symbol finishes";
 const CAP_CAUSE = "daily adjustment limit reached; a later end-of-day run applies it";
 const NO_BARS_REASON = "no bars stored in the requested range";
 const NO_BARS_MESSAGE = "No bars are stored for these symbols over a common period within the requested range.";
-const RANGE_ORDER_MESSAGE = "from must not be after to.";
 const RANGE_LENGTH_MESSAGE = `The range must not exceed ${MAX_RANGE_YEARS} years.`;
 const CURSOR_MESSAGE = "cursor is not valid.";
-
-const dateSchema = z.iso.date();
-const symbolInputSchema = z.string().min(1).max(MAX_SYMBOL_INPUT_LENGTH);
 
 const historyInputSchema = z.object({
   symbol: symbolInputSchema,

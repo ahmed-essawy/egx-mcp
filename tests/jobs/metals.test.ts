@@ -32,7 +32,7 @@ const SATURDAY = "2026-10-24";
 const IN_WINDOW_ON_CADENCE = "10:30";
 const IN_WINDOW_OFF_CADENCE = "10:31";
 const REFERENCE_TIME = "19:00";
-const STORE_TABLES = ["notices", "market_calendar"];
+const STORE_TABLES = ["notices", "market_calendar", "job_state"];
 const TRADINGVIEW = "tradingview";
 const ISAGHA = "isagha";
 const EGP_PER_GRAM = "EGP/g";
@@ -348,6 +348,7 @@ describe("reference job metalsFx step", () => {
     const runner = createRunner(SATURDAY);
 
     await runner.run();
+    await env.DB.prepare("DELETE FROM job_state").run();
     await runner.run();
 
     expect(runner.kvWrites.filter((key) => key === SNAPSHOT_KEY)).toHaveLength(1);
