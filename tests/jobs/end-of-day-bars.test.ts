@@ -1,6 +1,7 @@
 import { env } from "cloudflare:test";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { endOfDayJob } from "../../src/jobs/end-of-day";
+import type { NewIndexValue } from "../../src/store/d1/bars";
 import type { QuoteEntry, Snapshot, Stats } from "../../src/store/kv";
 import { restoreBindings, setBindings } from "../helpers/bindings";
 import {
@@ -40,12 +41,21 @@ const THURSDAY = "2026-10-22";
 const FAR_EX_DATE = "2026-10-30";
 const RUN_TIME = "15:30";
 const LATER_RUN_TIME = "16:31";
+const SECOND_CRON_RUN_TIME = "16:30";
 const EOD_BARS_JOB = "eod_bars";
 const BARS_STEP = "bars";
 const DISCREPANCIES_STEP = "discrepancies";
+const INDEX_VALUES_STEP = "indexValues";
 const STATS_KEY = "stats:v1";
 const DIRECTORY_KEY = "directory:v1";
-const STORE_KV_KEYS = [SNAPSHOT_KEY, LAST_SESSION_KEY, STATS_KEY, DIRECTORY_KEY];
+const INDEX_CLOSES_KEY_PREFIX = "snapshot:index-closes:";
+const STORE_KV_KEYS = [
+  SNAPSHOT_KEY,
+  LAST_SESSION_KEY,
+  STATS_KEY,
+  DIRECTORY_KEY,
+  `${INDEX_CLOSES_KEY_PREFIX}${FRIDAY}`,
+];
 const STORE_TABLES = [
   "daily_bars",
   "index_values",
@@ -360,6 +370,40 @@ async function seedLongHistory(index: number, count: number): Promise<void> {
   }
 }
 
+function withFailingIndexInsert(source: Env): Env {
+  const db = new Proxy(source.DB, {
+    get(target, property) {
+      if (property !== "prepare") return bindMember(target, property);
+      return (sql: string) => {
+        if (sql.includes("INTO index_values")) throw new Error("index_values write failed");
+        return target.prepare(sql);
+      };
+    },
+  });
+  return Object.create(source, { DB: { value: db } }) as Env;
+}
+
+function snapshotWithoutTodaysIndices(): Partial<Snapshot> {
+  const partial = marketSnapshot(TODAY);
+  const stale = indexEntry(49234.3, -3.56);
+  return { ...partial, indices: { EGX30: { ...stale, tt: stale.tt - SECONDS_PER_DAY } } };
+}
+
+function fridayCloses(): NewIndexValue[] {
+  return [{ indexCode: "EGX30", sessionDate: FRIDAY, close: 48000.5, changePct: 1.25, source: BACKUP_SOURCE }];
+}
+
+async function seedIndexClosesKey(date: string, closes: NewIndexValue[]): Promise<void> {
+  await env.DATA.put(`${INDEX_CLOSES_KEY_PREFIX}${date}`, JSON.stringify(closes));
+}
+
+async function seedIndexValue(close: number, source: string): Promise<void> {
+  await env.DB
+    .prepare("INSERT INTO index_values (index_code, session_date, close, change_pct, source) VALUES ('EGX30', ?1, ?2, NULL, ?3)")
+    .bind(TODAY, close, source)
+    .run();
+}
+
 async function jobFailures(step: string) {
   return (await readNotices("job_failed")).filter((notice) => notice.details.step === step);
 }
@@ -506,6 +550,69 @@ describe("endOfDayJob bars", () => {
       expect(await readIndexValues()).toEqual([
         { index_code: "EGX30", session_date: TODAY, close: 49234.3, change_pct: -3.56, source: BACKUP_SOURCE },
       ]);
+    });
+
+    it("stores the index closes kept for an earlier session after the last-session snapshot was overwritten, and inserts nothing new on a second run", async () => {
+      await seedMarket();
+      await seedLastSessionSnapshot(marketSnapshot(TODAY));
+      await seedIndexClosesKey(FRIDAY, fridayCloses());
+      stubFetch();
+
+      await createRunner().run();
+      const afterFirstRun = await readIndexValues();
+      await createRunner().run(LATER_RUN_TIME);
+
+      expect(afterFirstRun).toContainEqual({
+        index_code: "EGX30",
+        session_date: FRIDAY,
+        close: 48000.5,
+        change_pct: 1.25,
+        source: BACKUP_SOURCE,
+      });
+      expect(await readIndexValues()).toEqual(afterFirstRun);
+    });
+
+    it("raises one job_failed for the indexValues step when no index entry is dated today and still runs the later steps", async () => {
+      await seedSnapshot(snapshotWithoutTodaysIndices());
+      stubFetch();
+
+      await createRunner().run();
+      const failures = await jobFailures(INDEX_VALUES_STEP);
+
+      expect(failures).toHaveLength(1);
+      expect(failures[0]?.details).toMatchObject({ job: "end_of_day", step: INDEX_VALUES_STEP });
+      expect(await readIndexValues()).toEqual([]);
+      expect(await env.DATA.get(STATS_KEY)).not.toBeNull();
+      expect((await readLastSession())?.session.date).toBe(TODAY);
+    });
+
+    it("raises the notice and still runs the other steps when the index insert fails", async () => {
+      await seedMarket();
+      stubFetch();
+      const runner = createJobRunner(
+        (source, now) => endOfDayJob(withFailingIndexInsert(source), now),
+        { date: TODAY, time: RUN_TIME },
+      );
+
+      await runner.run();
+
+      expect(await jobFailures(INDEX_VALUES_STEP)).toHaveLength(1);
+      expect(await readBars()).toHaveLength(MARKET_ISINS.length);
+      expect(await env.DATA.get(STATS_KEY)).not.toBeNull();
+      expect((await readLastSession())?.session.date).toBe(TODAY);
+    });
+
+    it("keeps the close of an existing mubasher row for the index and session", async () => {
+      await seedMarket();
+      await seedIndexValue(50000, PRIMARY_SOURCE);
+      stubFetch();
+
+      await createRunner().run();
+
+      expect((await readIndexValues()).find((row) => row.index_code === "EGX30")).toMatchObject({
+        close: 50000,
+        source: PRIMARY_SOURCE,
+      });
     });
   });
 
@@ -705,6 +812,43 @@ describe("endOfDayJob bars", () => {
       expect(fetchStub).not.toHaveBeenCalled();
       expect(await readBars()).toEqual([]);
       expect(await readLastRunDate(EOD_BARS_JOB)).toBeNull();
+    });
+
+    it("does not run at the window end minute of a special-hours day closing at 15:15, and runs at the next cron tick", async () => {
+      await seedCalendar([{ date: TODAY, kind: "special_hours", openTime: "10:00", closeTime: "15:15" }]);
+      await seedMarket();
+      stubFetch();
+      const runner = createRunner();
+
+      await runner.run(RUN_TIME);
+      expect(await readBars()).toEqual([]);
+      expect(await readLastRunDate(EOD_BARS_JOB)).toBeNull();
+
+      await runner.run(SECOND_CRON_RUN_TIME);
+      expect((await readBars()).length).toBeGreaterThan(0);
+    });
+
+    it("runs at the first cron time on a normal day", async () => {
+      await seedMarket();
+      stubFetch();
+
+      await createRunner().run(RUN_TIME);
+
+      expect((await readBars()).length).toBeGreaterThan(0);
+    });
+
+    it("waits for the second cron time when the refresh window of a special-hours day closing at 16:00 ends at 16:15", async () => {
+      await seedCalendar([{ date: TODAY, kind: "special_hours", openTime: "10:00", closeTime: "16:00" }]);
+      await seedMarket();
+      stubFetch();
+      const runner = createRunner();
+
+      await runner.run(RUN_TIME);
+      expect(await readBars()).toEqual([]);
+      expect(await readLastRunDate(EOD_BARS_JOB)).toBeNull();
+
+      await runner.run(SECOND_CRON_RUN_TIME);
+      expect((await readBars()).length).toBeGreaterThan(0);
     });
 
     it("runs once per Cairo date", async () => {

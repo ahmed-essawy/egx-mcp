@@ -3,12 +3,18 @@ import { cloudflareTest, readD1Migrations } from "@cloudflare/vitest-pool-worker
 import { configDefaults, defineConfig } from "vitest/config";
 
 const NODE_TEST_FILES = [
+  "tests/unit/all-tools.test.ts",
   "tests/unit/backfill.test.ts",
   "tests/unit/fundamentals-store.test.ts",
   "tests/unit/funds-store.test.ts",
+  "tests/unit/index-history-tools.test.ts",
+  "tests/unit/index-summary-tools.test.ts",
+  "tests/unit/index-series-store.test.ts",
+  "tests/unit/node-mcp.test.ts",
   "tests/unit/oauth-guard.test.ts",
   "tests/unit/sign-in.test.ts",
   "tests/unit/server.test.ts",
+  "tests/unit/tool-provenance.test.ts",
 ];
 
 export default defineConfig(async () => {

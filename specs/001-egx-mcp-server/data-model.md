@@ -170,6 +170,7 @@ Every read reports `meta.rows_read`; the request adds it to `usage_global.rows_r
 |---|---|---|---|
 | `snapshot:v1` | snapshot job | at most 1 per minute in the window, only when content changed | `cacheTtl` 30 s, isolate memo 30 s |
 | `snapshot:last-session` | snapshot job (`putLastSessionSnapshot`, on the run at the window end); the end-of-day job writes it instead when that run was missed | 1 per trading day (read by `get_daily_summary` through `getLastSessionSnapshot`) | 300 s |
+| `snapshot:index-closes:<date>` | snapshot job (`putIndexCloses`, on the run at the window end, next to `snapshot:last-session`); read by the end-of-day `indexValues` step for the 5 days before its own date | 1 per trading day, `expirationTtl` 6 days (retention 5 days plus 1) | direct read, no memo |
 | `directory:v1` | end-of-day job (symbols part), reference job (funds part) and the snapshot job's bootstrap (symbols part, only while the key is missing) | at most 2 per day, 3 on a day the bootstrap runs, only on change | 300 s |
 | `oauth:purge-cursor` | maintenance job (`getPurgeCursor`, `putPurgeCursor`) | at most 1 per week | n/a |
 | `stats:v1` | EOD job | 1 per trading day | 300 s |

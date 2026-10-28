@@ -13,8 +13,9 @@ import {
 } from "../../store/d1/bars";
 import { getDirectory, type DirectorySymbol } from "../../store/kv";
 import { defineTool, type ToolContext } from "../define-tool";
-import { fail, ok, type Meta } from "../envelope";
+import { fail, ok, type Meta, type Provenance } from "../envelope";
 import { envelopeSchema } from "../output-schema";
+import { closeProvenance, computedProvenance, STORED_BARS_SOURCE } from "../provenance";
 import { resolveSymbol } from "../resolve";
 import { roundPercent, roundPrice } from "../rounding";
 import { loadMarketClock, sessionMeta, type MarketClock } from "../session";
@@ -216,7 +217,7 @@ function barOf(bar: HistoryBar, series: Series, actions: PendingAction[]): Bar {
   };
 }
 
-function metaOf(clock: MarketClock, source: string | null, notAvailable: Notice[]): Meta {
+function metaOf(clock: MarketClock, source: string | null, notAvailable: Notice[], provenance: Provenance[]): Meta {
   return {
     label: "end_of_day",
     dataTime: null,
@@ -225,6 +226,7 @@ function metaOf(clock: MarketClock, source: string | null, notAvailable: Notice[
     staleReason: null,
     session: sessionMeta(clock, null),
     notAvailable,
+    provenance,
   };
 }
 
@@ -259,7 +261,9 @@ async function priceHistory(
       bars: page.map((bar) => barOf(bar, series, actions)),
       nextCursor: hasMore ? encodeCursor(last.sessionDate) : null,
     },
-    metaOf(clock, last?.source ?? null, adjustedNotAvailable(actions.filter((action) => action.adjAffected))),
+    metaOf(clock, last?.source ?? null, adjustedNotAvailable(actions.filter((action) => action.adjAffected)),
+      closeProvenance(["bars"], page.map((bar) => ({ date: bar.sessionDate, source: bar.source })), false),
+    ),
   );
 }
 
@@ -315,13 +319,13 @@ async function compareSymbols(
     ...missing.map((isin) => ({ field: entryByIsin.get(isin)?.[1] ?? isin, reason: NO_BARS_REASON })),
     ...adjustedNotAvailable(actions.filter((action) => action.adjAffected)),
   ];
+  const commonFrom = items.map((item) => item.firstDate).reduce((latest, date) => (date > latest ? date : latest));
+  const commonTo = items.map((item) => item.lastDate).reduce((earliest, date) => (date < earliest ? date : earliest));
   return ok(
-    {
-      items,
-      commonFrom: items.map((item) => item.firstDate).reduce((latest, date) => (date > latest ? date : latest)),
-      commonTo: items.map((item) => item.lastDate).reduce((earliest, date) => (date < earliest ? date : earliest)),
-    },
-    metaOf(clock, null, notAvailable),
+    { items, commonFrom, commonTo },
+    metaOf(clock, null, notAvailable, [
+      computedProvenance(["items", "commonFrom", "commonTo"], STORED_BARS_SOURCE, commonTo, "close", false),
+    ]),
   );
 }
 

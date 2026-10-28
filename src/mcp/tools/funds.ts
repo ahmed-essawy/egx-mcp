@@ -9,15 +9,15 @@ import { holidaysBetween } from "../../store/d1/calendar";
 import { cpiAt } from "../../store/d1/inflation";
 import type { Directory } from "../../store/kv";
 import { defineTool, type ToolContext } from "../define-tool";
-import { fail, ok, type Label, type Meta } from "../envelope";
+import { fail, ok, type Label, type Meta, type Provenance } from "../envelope";
 import { envelopeSchema } from "../output-schema";
+import { closeProvenance, computedProvenance, STORED_BARS_SOURCE, STORED_INDEX_SOURCE } from "../provenance";
 import { resolveFund, resolveSymbol } from "../resolve";
 import { roundPercent, roundPrice } from "../rounding";
 import { loadMarketClock, type MarketClock } from "../session";
 import { counted, dateSchema, found, loadDirectory, RANGE_ORDER_MESSAGE, symbolInputSchema, unresolvedSymbol, type Found } from "../shared";
 
 const FUND_SOURCE = "mubasher";
-const BARS_SOURCE = "stored daily bars";
 const EGX30_CODE = "EGX30";
 const HISTORY_PAGE_SIZE = 500;
 const MIN_FUNDS = 2;
@@ -118,7 +118,8 @@ const realReturnOutputSchema = envelopeSchema(
 
 type Performance = z.infer<typeof performanceSchema>;
 type FundNav = { profile: FundProfile; latest: NavPoint };
-type Basis = { label: Label; source: string; valueAt: (date: string) => Promise<number | null> };
+type Dated = { value: number; date: string };
+type Basis = { label: Label; source: string; valueAt: (date: string) => Promise<Dated | null> };
 
 function noNav(fundId: string): Found<never> {
   return { ok: false, result: fail("not_available", `No NAV is stored for ${fundId} yet.`) };
@@ -188,7 +189,13 @@ function currencyGapOf({ profile }: FundNav): NotAvailable[] {
   return [{ field: "currency", reason: `currency assumed ${profile.currency}` }];
 }
 
-function metaOf(label: Label, source: string, staleReasons: string[], notAvailable: NotAvailable[]): Meta {
+function metaOf(
+  label: Label,
+  source: string,
+  staleReasons: string[],
+  notAvailable: NotAvailable[],
+  provenanceFor: (stale: boolean) => Provenance[],
+): Meta {
   const stale = staleReasons.length > 0;
   return {
     label,
@@ -198,12 +205,24 @@ function metaOf(label: Label, source: string, staleReasons: string[], notAvailab
     staleReason: stale ? staleReasons.join(" ") : null,
     session: null,
     notAvailable,
+    provenance: provenanceFor(stale),
   };
 }
 
-function navMetaFor(funds: FundNav[], clock: MarketClock, notAvailable: NotAvailable[] = []): Meta {
+function navMetaFor(
+  funds: FundNav[],
+  clock: MarketClock,
+  notAvailable: NotAvailable[],
+  provenanceFor: (stale: boolean) => Provenance[],
+): Meta {
   const staleReasons = funds.flatMap((fund) => staleReasonOf(fund, clock) ?? []);
-  return metaOf("daily_nav", FUND_SOURCE, staleReasons, [...funds.flatMap(currencyGapOf), ...notAvailable]);
+  return metaOf(
+    "daily_nav",
+    FUND_SOURCE,
+    staleReasons,
+    [...funds.flatMap(currencyGapOf), ...notAvailable],
+    provenanceFor,
+  );
 }
 
 function longestAvailablePeriod(end: string, available: Period[]): Period | null {
@@ -250,13 +269,17 @@ async function performanceOf(ctx: ToolContext, fundNav: FundNav): Promise<Record
   return Object.fromEntries(entries) as Record<Period, Performance>;
 }
 
-async function egx30Return(ctx: ToolContext, period: Period, end: string): Promise<number | null> {
+async function egx30Return(
+  ctx: ToolContext,
+  period: Period,
+  end: string,
+): Promise<{ pct: number; asOf: string } | null> {
   const [start, last] = await Promise.all([
     counted(ctx.rows, indexCloseAt(ctx.env.DB, EGX30_CODE, anchorDate(period, end))),
     counted(ctx.rows, indexCloseAt(ctx.env.DB, EGX30_CODE, end)),
   ]);
   if (start === null || last === null || start.sessionDate === last.sessionDate) return null;
-  return roundPercent(percentChange(start.close, last.close));
+  return { pct: roundPercent(percentChange(start.close, last.close)), asOf: last.sessionDate };
 }
 
 function newestDate(dates: string[]): string {
@@ -267,7 +290,10 @@ function fundBasis(ctx: ToolContext, profile: FundProfile): Basis {
   return {
     label: "daily_nav",
     source: FUND_SOURCE,
-    valueAt: async (date) => (await counted(ctx.rows, navAt(ctx.env.DB, profile.fundId, date)))?.nav ?? null,
+    valueAt: async (date) => {
+      const point = await counted(ctx.rows, navAt(ctx.env.DB, profile.fundId, date));
+      return point === null ? null : { value: point.nav, date: point.navDate };
+    },
   };
 }
 
@@ -277,8 +303,11 @@ function symbolBasis(ctx: ToolContext, directory: Directory, input: string): Fou
   const isin = resolution.entry[0];
   return found({
     label: "end_of_day",
-    source: BARS_SOURCE,
-    valueAt: async (date) => (await counted(ctx.rows, barCloseAt(ctx.env.DB, isin, date)))?.close ?? null,
+    source: STORED_BARS_SOURCE,
+    valueAt: async (date) => {
+      const bar = await counted(ctx.rows, barCloseAt(ctx.env.DB, isin, date));
+      return bar === null ? null : { value: bar.close, date: bar.sessionDate };
+    },
   });
 }
 
@@ -295,7 +324,7 @@ async function basisFor(
   return { ok: false, result: fail("invalid_input", EXACTLY_ONE_MESSAGE) };
 }
 
-function missingPriceReasons(start: number | null, end: number | null, from: string, to: string): string[] {
+function missingPriceReasons(start: Dated | null, end: Dated | null, from: string, to: string): string[] {
   return [
     ...(start === null ? [`no data on or before ${from}`] : []),
     ...(end === null ? [`no data on or before ${to}`] : []),
@@ -347,7 +376,10 @@ function registerGetFund(server: McpServer, env: Env, auth: AuthProps): void {
             cycleDays: profile.cycleDays,
             performance,
           },
-          navMetaFor([fundNav], navClock),
+          navMetaFor([fundNav], navClock, [], (stale) => [
+            ...closeProvenance(["nav", "navDate"], [{ date: latest.navDate, source: FUND_SOURCE }], stale),
+            computedProvenance(["performance"], FUND_SOURCE, latest.navDate, "close", stale),
+          ]),
         );
       },
     },
@@ -393,7 +425,13 @@ function registerGetFundHistory(server: McpServer, env: Env, auth: AuthProps): v
             earliestAvailable: earliest?.navDate ?? null,
             nextCursor,
           },
-          navMetaFor(funds, navClock),
+          navMetaFor(funds, navClock, [], (stale) =>
+            closeProvenance(
+              ["navs"],
+              navs.map(({ navDate }) => ({ date: navDate, source: FUND_SOURCE })),
+              stale,
+            ),
+          ),
         );
       },
     },
@@ -430,18 +468,22 @@ function registerCompareFunds(server: McpServer, env: Env, auth: AuthProps): voi
           const identity = { fundId: profile.fundId, currency: profile.currency };
           return "pct" in performance ? { ...identity, returnPct: performance.pct } : { ...identity, ...performance };
         });
-        const egx30ReturnPct = includeEgx30
-          ? await egx30Return(ctx, period, newestDate(compared.map(({ latest }) => latest.navDate)))
-          : undefined;
+        const newestNavDate = newestDate(compared.map(({ latest }) => latest.navDate));
+        const egx30 = includeEgx30 ? await egx30Return(ctx, period, newestNavDate) : undefined;
         const egx30Gap: NotAvailable[] =
-          egx30ReturnPct === null ? [{ field: "egx30ReturnPct", reason: EGX30_GAP_REASON }] : [];
+          egx30 === null ? [{ field: "egx30ReturnPct", reason: EGX30_GAP_REASON }] : [];
         return ok(
           {
             items,
-            egx30ReturnPct,
+            egx30ReturnPct: egx30 === undefined ? undefined : (egx30?.pct ?? null),
             currenciesDiffer: new Set(compared.map(({ profile }) => profile.currency)).size > 1,
           },
-          navMetaFor(compared, navClock, egx30Gap),
+          navMetaFor(compared, navClock, egx30Gap, (stale) => [
+            computedProvenance(["items"], FUND_SOURCE, newestNavDate, "close", stale),
+            ...(egx30
+              ? [computedProvenance(["egx30ReturnPct"], STORED_INDEX_SOURCE, egx30.asOf, "close", false)]
+              : []),
+          ]),
         );
       },
     },
@@ -476,9 +518,9 @@ function registerGetRealReturn(server: McpServer, env: Env, auth: AuthProps): vo
         if (start === null || end === null || startCpi === null || endCpi === null) {
           const reason = [...new Set([...missingPriceReasons(start, end, from, to), ...cpiGaps])].join(REASON_SEPARATOR);
           const notAvailable = cpiGaps.length > 0 ? [{ field: "inflationPct", reason }] : [];
-          return ok({ status: "not_available", reason }, metaOf(label, source, [], notAvailable));
+          return ok({ status: "not_available", reason }, metaOf(label, source, [], notAvailable, () => []));
         }
-        const nominal = percentChange(start, end);
+        const nominal = percentChange(start.value, end.value);
         const inflation = percentChange(startCpi.cpiIndex, endCpi.cpiIndex);
         const inflationSource = [...new Set([startCpi.source, endCpi.source])].join(SOURCE_SEPARATOR);
         return ok(
@@ -489,7 +531,10 @@ function registerGetRealReturn(server: McpServer, env: Env, auth: AuthProps): vo
             inflationSource,
             inflationMonths: [monthOf(from), monthOf(to)],
           },
-          metaOf(label, [source, inflationSource].join(SOURCE_SEPARATOR), [], []),
+          metaOf(label, [source, inflationSource].join(SOURCE_SEPARATOR), [], [], () => [
+            computedProvenance(["nominalPct", "realPct"], source, end.date, "close", false),
+            computedProvenance(["inflationPct", "realPct"], inflationSource, monthOf(to), "period", false),
+          ]),
         );
       },
     },

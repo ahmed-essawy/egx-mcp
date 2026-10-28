@@ -12,6 +12,7 @@ import {
   type CalendarRow,
   type TimeRange,
 } from "../domain/calendar";
+import { indexClosesOf } from "../domain/index-closes";
 import { INDEX_CODES } from "../domain/indices";
 import { mubasherStocks } from "../providers/mubasher";
 import { tradingViewIndices, tradingViewStocks } from "../providers/tradingview";
@@ -22,6 +23,7 @@ import { getJobState, markJobRun } from "../store/d1/jobs";
 import {
   getDirectory,
   getSnapshot,
+  putIndexCloses,
   putLastSessionSnapshot,
   putSnapshotIfChanged,
   type Directory,
@@ -327,7 +329,9 @@ function isRetailMinute(today: CairoParts): boolean {
 
 async function persist(env: Env, next: Snapshot, isWindowEnd: boolean): Promise<void> {
   await putSnapshotIfChanged(env, next);
-  if (isWindowEnd && !next.session.noTradesToday) await putLastSessionSnapshot(env, next);
+  if (!isWindowEnd || next.session.noTradesToday) return;
+  await putLastSessionSnapshot(env, next);
+  await putIndexCloses(env, next.session.date, indexClosesOf(next, next.session.date));
 }
 
 async function ensureDirectory(env: Env, today: CairoParts, now: number): Promise<BootstrapResult> {

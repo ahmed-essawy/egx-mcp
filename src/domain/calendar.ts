@@ -22,6 +22,7 @@ const DEFAULT_OPEN_TIME = "10:00";
 const DEFAULT_CLOSE_TIME = "14:30";
 const REFRESH_LEAD_MINUTES = 5;
 const REFRESH_LAG_MINUTES = 15;
+const END_OF_DAY_EARLIEST = "15:30";
 
 const cairoFormatter = new Intl.DateTimeFormat("en-CA", {
   timeZone: CAIRO_TIME_ZONE,
@@ -104,6 +105,11 @@ export function refreshWindow(row: CalendarRow | null): TimeRange {
   };
 }
 
+export function isEndOfDayDue(time: string, row: CalendarRow | null): boolean {
+  const minutes = toMinutes(time);
+  return minutes >= toMinutes(END_OF_DAY_EARLIEST) && minutes > toMinutes(refreshWindow(row).end);
+}
+
 export function hasSessionOpened(time: string, row: CalendarRow | null): boolean {
   return toMinutes(time) >= toMinutes(sessionHours(row).start);
 }
@@ -126,6 +132,12 @@ export function previousTradingDay(date: string, holidays: ReadonlySet<string>):
       .slice(0, 10);
   } while (!isTradingDate(candidate, holidays));
   return candidate;
+}
+
+export function precedingDays(date: string, count: number): string[] {
+  return Array.from({ length: count }, (_value, index) =>
+    new Date(Date.parse(`${date}T00:00:00Z`) - (index + 1) * MILLIS_PER_DAY).toISOString().slice(0, ISO_DATE_LENGTH),
+  );
 }
 
 export function nextUtcMidnight(unixSeconds: number): number {

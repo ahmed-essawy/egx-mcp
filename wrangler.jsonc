@@ -24,7 +24,7 @@
     }
   ],
   "triggers": {
-    "crons": ["* 6-12 * * SUN-THU", "30 12,13 * * SUN-THU", "0 16 * * *", "0 1 * * SAT"]
+    "crons": ["* 6-13 * * SUN-THU", "30 12,13,14 * * SUN-THU", "0 16 * * *", "0 1 * * SAT"]
   },
   "vars": {
     "GLOBAL_DAILY_CALLS": "15000",

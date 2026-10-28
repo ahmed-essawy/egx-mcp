@@ -5,6 +5,7 @@ const PROVIDER_ID = "isagha";
 const GOLD_URL = "https://market.isagha.com/prices";
 const SILVER_URL = "https://market.isagha.com/prices/silver";
 const GOLD_UNITS = ["18", "21", "24"];
+const GOLD_POUND_UNIT = "pound";
 const SILVER_UNITS = ["925", "999"];
 const ROW_SELECTOR = 'tr[data-testid="prices-row"]';
 const FIGURE_SELECTOR = `${ROW_SELECTOR} [data-testid="price-figure"]`;
@@ -56,7 +57,18 @@ function toUnitPrice(unit: string, figures: string[]): UnitPrice {
   return { buy, sell };
 }
 
-async function fetchUnits(url: string, units: string[]): Promise<Record<string, UnitPrice>> {
+function readOptionalUnit(rows: Map<string, string[]>, unit: string): Record<string, UnitPrice> {
+  const figures = rows.get(unit);
+  if (figures === undefined) return {};
+  try {
+    return { [unit]: toUnitPrice(unit, figures) };
+  } catch (error) {
+    if (error instanceof ProviderError) return {};
+    throw error;
+  }
+}
+
+async function fetchUnits(url: string, units: string[], optionalUnits: string[] = []): Promise<Record<string, UnitPrice>> {
   const rows = await readRows(await fetchText(PROVIDER_ID, url));
   if (rows.size === 0) throw new ProviderError(PROVIDER_ID, "parse", `${url} has no price rows`);
   const prices: Record<string, UnitPrice> = {};
@@ -65,13 +77,14 @@ async function fetchUnits(url: string, units: string[]): Promise<Record<string, 
     if (figures === undefined) throw new ProviderError(PROVIDER_ID, "parse", `${url} has no row for unit ${unit}`);
     prices[unit] = toUnitPrice(unit, figures);
   }
+  for (const unit of optionalUnits) Object.assign(prices, readOptionalUnit(rows, unit));
   return prices;
 }
 
 export const isaghaRetail: EgyptMetalsProvider = {
   id: PROVIDER_ID,
   async fetchRetail() {
-    const [gold, silver] = await Promise.all([fetchUnits(GOLD_URL, GOLD_UNITS), fetchUnits(SILVER_URL, SILVER_UNITS)]);
+    const [gold, silver] = await Promise.all([fetchUnits(GOLD_URL, GOLD_UNITS, [GOLD_POUND_UNIT]), fetchUnits(SILVER_URL, SILVER_UNITS)]);
     return { gold, silver };
   },
 };

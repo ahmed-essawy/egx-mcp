@@ -26,6 +26,7 @@ type IndicesMeta = {
   label: string;
   source: string | null;
   session: { date: string; status: string } | null;
+  provenance: Record<string, unknown>[];
 };
 type IndicesPayload = { data: { indices: IndexItem[] }; meta: IndicesMeta };
 
@@ -82,6 +83,21 @@ describe("get_indices contract", () => {
     expect(meta.label).toBe("delayed");
     expect(meta.source).toBe(INDEX_SOURCE);
     expect(meta.session).toEqual({ date: SESSION_DATE, status: "closed" });
+  });
+
+  it("reports one primary trade entry for the index source", async () => {
+    const { meta } = payloadOf(await callTool(INDICES_TOOL, { names: [] }, key));
+
+    expect(meta.provenance).toEqual([
+      {
+        fields: ["indices"],
+        source: INDEX_SOURCE,
+        dataTime: MARKET_TRADE_TIME_ISO,
+        timeKind: "trade",
+        stale: false,
+        basis: "primary",
+      },
+    ]);
   });
 
   it.each([

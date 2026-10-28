@@ -23,8 +23,9 @@ import {
 } from "../../store/d1/personal";
 import { getDirectory, getSnapshot, type Directory, type DirectorySymbol, type QuoteEntry, type Snapshot } from "../../store/kv";
 import { defineTool, type ToolContext } from "../define-tool";
-import { fail, ok, type Meta } from "../envelope";
+import { fail, ok, type Meta, type Provenance } from "../envelope";
 import { envelopeSchema } from "../output-schema";
+import { computedProvenance, MARKET_EVENTS_SOURCE, primaryStockSource, quoteProvenance } from "../provenance";
 import { MAX_SYMBOL_INPUT_LENGTH, resolveSymbol } from "../resolve";
 import { roundPercent, roundPrice, roundTurnover } from "../rounding";
 import { loadMarketClock, sessionMeta, type MarketClock } from "../session";
@@ -50,6 +51,13 @@ const EVENTS_TRUNCATED_REASON = `only the first ${DEFAULT_EVENTS_LIMIT} events a
 const DISCLOSURES_REASON = "not available from current sources";
 export const MAX_HOLDING_NUMBER = 1_000_000_000;
 const VISIBLE_EVENT_KINDS: readonly EventKind[] = ["new_nav", "big_move", "new_listing", "corporate_action"];
+const PROVENANCE_EVENT_KINDS: readonly EventKind[] = ["big_move", "new_listing", "corporate_action"];
+const NEW_NAV_KINDS: readonly EventKind[] = ["new_nav"];
+const NEW_NAV_FIELDS = ["newNavs"];
+const HOLDINGS_FIELDS = ["holdings"];
+const PORTFOLIO_COMPUTED_FIELDS = ["totals", "allocationBySector", "levelsCrossed"];
+const EVENT_FIELDS = ["bigMoves", "newListings", "corporateActions"];
+const CROSSED_FIELDS = ["levelsCrossed"];
 
 const idSchema = z.number().int().positive();
 
@@ -166,6 +174,7 @@ function personalMeta(overrides: Partial<Meta> = {}): Meta {
     staleReason: null,
     session: null,
     notAvailable: [],
+    provenance: [],
     ...overrides,
   };
 }
@@ -293,19 +302,35 @@ function allocationOf(positions: Position[], index: SymbolIndex, totalValue: num
     }));
 }
 
-function portfolioMeta(holdings: Holding[], snapshot: Snapshot | null, clock: MarketClock): Meta {
+function portfolioProvenance(
+  quotes: QuoteEntry[],
+  snapshot: Snapshot | null,
+  clock: MarketClock,
+  primarySource: string,
+  dataTime: string | null,
+  stale: boolean,
+): Provenance[] {
+  if (snapshot === null) return [];
+  const held = quoteProvenance(HOLDINGS_FIELDS, quotes, primarySource, clock);
+  if (quotes.length === 0) return held;
+  return [...held, computedProvenance(PORTFOLIO_COMPUTED_FIELDS, snapshot.sources.stocks, dataTime, "trade", stale)];
+}
+
+function portfolioMeta(holdings: Holding[], snapshot: Snapshot | null, clock: MarketClock, primarySource: string): Meta {
   const quotes = holdings.flatMap((holding) => snapshot?.quotes[holding.isin] ?? []);
   const staleReason = staleReasonOf(quotes, clock);
+  const dataTime = newestDataTime(quotes.map((quote) => quote.tt));
   const notAvailable = [];
   if (snapshot === null) notAvailable.push({ field: SNAPSHOT_FIELD, reason: SNAPSHOT_MISSING_REASON });
   else if (quotes.length < holdings.length) notAvailable.push({ field: PRICE_FIELD, reason: PRICE_MISSING_REASON });
   return personalMeta({
-    dataTime: newestDataTime(quotes.map((quote) => quote.tt)),
+    dataTime,
     source: snapshot?.sources.stocks ?? null,
     stale: staleReason !== null,
     staleReason,
     session: sessionMeta(clock, snapshot),
     notAvailable,
+    provenance: portfolioProvenance(quotes, snapshot, clock, primarySource, dataTime, staleReason !== null),
   });
 }
 
@@ -330,7 +355,7 @@ async function handlePortfolioGet(_args: unknown, ctx: ToolContext): Promise<Cal
       allocationBySector: allocationOf(positions, index, totals.value),
       levelsCrossed: settled.crossed.map((crossed) => crossedItem(crossed, index)),
     },
-    portfolioMeta(personal.holdings, snapshot, clock),
+    portfolioMeta(personal.holdings, snapshot, clock, primaryStockSource(ctx.cfg)),
   );
 }
 
@@ -428,6 +453,26 @@ function eventsNotAvailable(events: MarketEvent[]): Meta["notAvailable"] {
   return [{ field: EVENTS_FIELD, reason: EVENTS_TRUNCATED_REASON }];
 }
 
+function changesProvenance(events: MarketEvent[], crossed: CrossedLevel[], snapshot: Snapshot | null): Provenance[] {
+  const provenance: Provenance[] = [];
+  const eventEntries: [string[], readonly EventKind[]][] = [
+    [EVENT_FIELDS, PROVENANCE_EVENT_KINDS],
+    [NEW_NAV_FIELDS, NEW_NAV_KINDS],
+  ];
+  for (const [fields, kinds] of eventEntries) {
+    const occurrences = events.filter((event) => kinds.includes(event.kind)).map((event) => event.occurredAt);
+    if (occurrences.length === 0) continue;
+    const dataTime = toCairoIso(Math.max(...occurrences));
+    provenance.push(computedProvenance(fields, MARKET_EVENTS_SOURCE, dataTime, "fetched", false));
+  }
+  const crossingTimes = crossed.flatMap((level) => snapshot?.quotes[level.isin]?.tt ?? []);
+  if (snapshot !== null && crossingTimes.length > 0) {
+    const dataTime = toCairoIso(Math.max(...crossingTimes));
+    provenance.push(computedProvenance(CROSSED_FIELDS, snapshot.sources.stocks, dataTime, "trade", false));
+  }
+  return provenance;
+}
+
 async function handleChangesSince(args: z.infer<typeof sinceInputSchema>, ctx: ToolContext): Promise<CallToolResult> {
   const since = Math.floor(Date.parse(args.since) / MILLIS_PER_SECOND);
   if (since < ctx.now - MAX_SINCE_AGE_DAYS * SECONDS_PER_DAY) {
@@ -444,13 +489,17 @@ async function handleChangesSince(args: z.infer<typeof sinceInputSchema>, ctx: T
   const settled = await settleLevels(ctx, personal.levels, snapshot);
   if (!settled.ok) return settled.result;
   const index = indexByIsin(directory);
+  const events = eventsPage.events.slice(0, DEFAULT_EVENTS_LIMIT);
   return ok(
     {
-      ...groupEvents(eventsPage.events.slice(0, DEFAULT_EVENTS_LIMIT), index),
+      ...groupEvents(events, index),
       levelsCrossed: settled.crossed.map((crossed) => crossedItem(crossed, index)),
       disclosures: { status: "not_available" as const, reason: DISCLOSURES_REASON },
     },
-    personalMeta({ notAvailable: eventsNotAvailable(eventsPage.events) }),
+    personalMeta({
+      notAvailable: eventsNotAvailable(eventsPage.events),
+      provenance: changesProvenance(events, settled.crossed, snapshot),
+    }),
   );
 }
 

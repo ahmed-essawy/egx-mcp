@@ -147,6 +147,7 @@ function ownerMeta(): Meta {
     staleReason: null,
     session: null,
     notAvailable: [],
+    provenance: [],
   };
 }
 

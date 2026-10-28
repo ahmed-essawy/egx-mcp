@@ -36,6 +36,7 @@ const LAST_SESSION_DATE = "2026-10-25";
 const NEXT_SESSION_DATE = "2026-10-26";
 const SUMMARY_TOOL = "get_daily_summary";
 const TOP_COUNT = 5;
+const SUMMARY_MOVER_FIELDS = ["breadth", "totals", "topGainers", "topLosers"];
 const SUMMARY_FIELDS = ["indices", "breadth", "topGainers", "topLosers", "totals"];
 
 type SummaryData = {
@@ -52,6 +53,7 @@ type SummaryPayload = {
     dataTime: string | null;
     source: string | null;
     session: { date: string; status: string } | null;
+    provenance: Record<string, unknown>[];
   };
 };
 
@@ -123,6 +125,25 @@ describe("get_daily_summary contract", () => {
       expect(meta.source).toBe(STOCKS_SOURCE);
       expect(meta.dataTime).toBe(MARKET_TRADE_TIME_ISO);
       expect(meta.session).toEqual({ date: LAST_SESSION_DATE, status: "closed" });
+    });
+
+    it("reports the indices and the summary mover fields with the close time kind", async () => {
+      const { meta } = payloadOf(await callTool(SUMMARY_TOOL, {}, key));
+
+      expect(meta.provenance).toHaveLength(2);
+      expect(meta.provenance[0]).toMatchObject({
+        fields: ["indices"],
+        dataTime: LAST_SESSION_DATE,
+        timeKind: "close",
+        basis: "primary",
+      });
+      expect(meta.provenance[1]).toMatchObject({
+        fields: SUMMARY_MOVER_FIELDS,
+        source: STOCKS_SOURCE,
+        dataTime: LAST_SESSION_DATE,
+        timeKind: "close",
+        basis: "computed",
+      });
     });
   });
 

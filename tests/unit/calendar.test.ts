@@ -1,8 +1,10 @@
 import { describe, expect, it } from "vitest";
 import {
   cairoParts,
+  isEndOfDayDue,
   isTradingDay,
   nextUtcMidnight,
+  precedingDays,
   previousTradingDay,
   refreshWindow,
   sessionStatus,
@@ -117,6 +119,60 @@ describe("refreshWindow", () => {
 
   it("opens 5 minutes before the special open and closes 15 minutes after the special close", () => {
     expect(refreshWindow(specialHoursRow(SUMMER_WEDNESDAY))).toEqual(SPECIAL_REFRESH_WINDOW);
+  });
+});
+
+describe("precedingDays", () => {
+  it("lists the calendar days before a date, nearest first, across a month end", () => {
+    expect(precedingDays("2026-11-02", 3)).toEqual(["2026-11-01", "2026-10-31", "2026-10-30"]);
+  });
+
+  it("is empty for a count of zero", () => {
+    expect(precedingDays("2026-11-02", 0)).toEqual([]);
+  });
+});
+
+describe("isEndOfDayDue", () => {
+  const lateCloseRow: CalendarRow = {
+    date: SUMMER_WEDNESDAY,
+    kind: "special_hours",
+    open_time: "10:00",
+    close_time: "15:15",
+  };
+  const earlyCloseRow: CalendarRow = { ...lateCloseRow, close_time: "13:00" };
+
+  it("is due from 15:30 on a regular day", () => {
+    expect(isEndOfDayDue("15:29", null)).toBe(false);
+    expect(isEndOfDayDue("15:30", null)).toBe(true);
+  });
+
+  it("is not due at the refresh window end minute when special hours close at 15:15", () => {
+    expect(isEndOfDayDue("15:30", lateCloseRow)).toBe(false);
+    expect(isEndOfDayDue("15:31", lateCloseRow)).toBe(true);
+  });
+
+  it("is due at the next cron tick after a 15:15 close, in summer and in winter", () => {
+    expect(isEndOfDayDue("16:30", lateCloseRow)).toBe(true);
+    expect(isEndOfDayDue("17:30", lateCloseRow)).toBe(true);
+  });
+
+  it.each([
+    ["summer", ["2026-10-28T12:30:00Z", "2026-10-28T13:30:00Z", "2026-10-28T14:30:00Z"], ["15:30", "16:30", "17:30"], [false, true, true]],
+    ["winter", ["2026-12-02T12:30:00Z", "2026-12-02T13:30:00Z", "2026-12-02T14:30:00Z"], ["14:30", "15:30", "16:30"], [false, false, true]],
+  ])("maps the %s cron ticks to Cairo times for a 15:15 close", (_season, ticks, cairoTimes, expectedDue) => {
+    const times = ticks.map((tick) => cairoParts(Date.parse(tick) / 1000).time);
+    expect(times).toEqual(cairoTimes);
+    expect(times.map((time) => isEndOfDayDue(time, lateCloseRow))).toEqual(expectedDue);
+  });
+
+  it("waits for a later cron time when special hours close at 16:00", () => {
+    expect(isEndOfDayDue("15:30", { ...lateCloseRow, close_time: "16:00" })).toBe(false);
+    expect(isEndOfDayDue("16:15", { ...lateCloseRow, close_time: "16:00" })).toBe(false);
+    expect(isEndOfDayDue("16:30", { ...lateCloseRow, close_time: "16:00" })).toBe(true);
+  });
+
+  it("is due at 15:30 when special hours close at 13:00", () => {
+    expect(isEndOfDayDue("15:30", earlyCloseRow)).toBe(true);
   });
 });
 

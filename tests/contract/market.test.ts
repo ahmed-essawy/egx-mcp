@@ -43,6 +43,7 @@ const OVERVIEW_FIELDS = [
   "investorStats",
 ];
 const NOT_AVAILABLE_REASON = "not available from current sources";
+const OVERVIEW_MOVER_FIELDS = ["breadth", "totals", "topGainers", "topLosers", "mostActiveByVolume", "mostActiveByValue"];
 
 type MarketMeta = {
   label: string;
@@ -50,6 +51,7 @@ type MarketMeta = {
   source: string | null;
   session: { date: string; status: string } | null;
   notAvailable: { field: string; reason: string }[];
+  provenance: Record<string, unknown>[];
 };
 type OverviewData = {
   status: string;
@@ -106,6 +108,29 @@ describe("market contract", () => {
       expect(meta.label).toBe("delayed");
       expect(meta.source).toBe(STOCKS_SOURCE);
       expect(meta.dataTime).toBe(MARKET_TRADE_TIME_ISO);
+    });
+
+    it("reports the indices, then the computed mover fields", async () => {
+      const { meta } = payloadOf<OverviewData>(await callTool(OVERVIEW_TOOL, {}, key));
+
+      expect(meta.provenance).toEqual([
+        {
+          fields: ["indices"],
+          source: INDEX_SOURCE,
+          dataTime: MARKET_TRADE_TIME_ISO,
+          timeKind: "trade",
+          stale: false,
+          basis: "primary",
+        },
+        {
+          fields: OVERVIEW_MOVER_FIELDS,
+          source: STOCKS_SOURCE,
+          dataTime: MARKET_TRADE_TIME_ISO,
+          timeKind: "trade",
+          stale: false,
+          basis: "computed",
+        },
+      ]);
     });
 
     it("lists movers as quote summaries in the order the snapshot ranks them", async () => {

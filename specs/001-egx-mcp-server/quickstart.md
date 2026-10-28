@@ -26,7 +26,7 @@ npm test
 npx wrangler dev --test-scheduled
 ```
 
-Expected: tests pass (the test config pins the Miniflare compatibility date to 2026-08-22 so the Workers pool starts with the bundled `workerd`; production keeps `wrangler.jsonc` 2026-10-01, T127); `curl "http://localhost:8787/__scheduled?cron=*+6-12+*+*+SUN-THU"` writes `snapshot:v1` during the Cairo window and logs `skipped: outside window` otherwise.
+Expected: tests pass (the test config pins the Miniflare compatibility date to 2026-08-22 so the Workers pool starts with the bundled `workerd`; production keeps `wrangler.jsonc` 2026-10-01, T127); `curl "http://localhost:8787/__scheduled?cron=*+6-13+*+*+SUN-THU"` writes `snapshot:v1` during the Cairo window and logs `skipped: outside window` otherwise.
 
 ## Scenario 0: free-tier guard (constitution IV)
 

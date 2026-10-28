@@ -5,8 +5,8 @@ import { maintenanceJob } from "./maintenance";
 import { referenceJob } from "./reference";
 import { snapshotJob } from "./snapshot";
 
-const SNAPSHOT_CRON = "* 6-12 * * SUN-THU";
-const END_OF_DAY_CRON = "30 12,13 * * SUN-THU";
+const SNAPSHOT_CRON = "* 6-13 * * SUN-THU";
+const END_OF_DAY_CRON = "30 12,13,14 * * SUN-THU";
 const REFERENCE_CRON = "0 16 * * *";
 const MAINTENANCE_CRON = "0 1 * * SAT";
 const MS_PER_SECOND = 1000;

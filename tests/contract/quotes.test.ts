@@ -13,6 +13,7 @@ const USER_EMAIL = "user@example.com";
 const SESSION_DATE = "2026-10-25";
 const STALE_TRADE_DATE = "2026-10-20";
 const SOURCE = "tradingview";
+const BACKUP_SOURCE = "mubasher";
 const COMI_ISIN = "EGS60121C018";
 const COMI_TICKER = "COMI";
 const MAX_SYMBOLS = 20;
@@ -49,6 +50,7 @@ type QuotesMeta = {
   stale: boolean;
   staleReason: string | null;
   session: { date: string; status: string } | null;
+  provenance: { fields: string[]; source: string; basis: string; stale: boolean; timeKind: string }[];
 };
 type QuotesPayload = { data: { quotes: QuoteItem[] }; meta: QuotesMeta };
 
@@ -165,6 +167,21 @@ describe("get_quotes contract", () => {
       expect(data.quotes[0]?.dataTime).toBe("2026-10-25T11:30:00+03:00");
     });
 
+    it("reports the served source as a primary trade entry", async () => {
+      const { meta } = payloadOf(await getQuotes(key, [COMI_TICKER]));
+
+      expect(meta.provenance).toEqual([
+        {
+          fields: ["quotes"],
+          source: SOURCE,
+          dataTime: "2026-10-25T11:30:00+03:00",
+          timeKind: "trade",
+          stale: false,
+          basis: "primary",
+        },
+      ]);
+    });
+
     it("accepts an ISIN in place of the ticker", async () => {
       const [item] = payloadOf(await getQuotes(key, [COMI_ISIN])).data.quotes;
 
@@ -203,6 +220,15 @@ describe("get_quotes contract", () => {
         notice: "Delayed, unofficial data for information only. Not investment advice.",
       });
     });
+
+    it("reports no provenance on the error", async () => {
+      const symbols = Array.from({ length: OVER_SYMBOLS }, () => COMI_TICKER);
+
+      const result = await getQuotes(key, symbols);
+
+      expect(result.isError).toBe(true);
+      expect((result.structuredContent as unknown as { meta: { provenance: unknown } }).meta.provenance).toEqual([]);
+    });
   });
 
   describe("a missing directory", () => {
@@ -228,6 +254,21 @@ describe("get_quotes contract", () => {
     });
   });
 
+  describe("a snapshot whose primary source failed", () => {
+    it("reports the served source with the backup basis", async () => {
+      await seedSymbols([stock(COMI_ISIN, COMI_TICKER)]);
+      await seedSnapshot({
+        sources: { stocks: BACKUP_SOURCE, primaryFailed: true },
+        quotes: { [COMI_ISIN]: { ...quote(COMI_TICKER), src: BACKUP_SOURCE } },
+      });
+
+      const { meta } = payloadOf(await getQuotes(key, [COMI_TICKER]));
+
+      expect(meta.provenance).toHaveLength(1);
+      expect(meta.provenance[0]).toMatchObject({ source: BACKUP_SOURCE, basis: "backup" });
+    });
+  });
+
   describe("a stale quote", () => {
     it("flags a quote traded 3 sessions ago and names the data date", async () => {
       await seedSymbols([stock(COMI_ISIN, COMI_TICKER)]);
@@ -238,6 +279,7 @@ describe("get_quotes contract", () => {
       expect(data.quotes[0]).toMatchObject({ stale: true, tradeDate: STALE_TRADE_DATE });
       expect(meta.stale).toBe(true);
       expect(meta.staleReason).toContain(STALE_TRADE_DATE);
+      expect(meta.provenance[0]).toMatchObject({ source: SOURCE, stale: true });
     });
   });
 

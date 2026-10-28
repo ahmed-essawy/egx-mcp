@@ -62,6 +62,7 @@ const FIXTURE_RETAIL = {
     "18": { buy: 5361.5, sell: 5400 },
     "21": { buy: 6255, sell: 6300 },
     "24": { buy: 7148.5, sell: 7200 },
+    pound: { sell: 50400, buy: 50040 },
   },
   silver: {
     "925": { buy: 89.75, sell: 92.5 },
@@ -170,7 +171,7 @@ describe("isaghaRetail", () => {
     expect(isaghaRetail.id).toBe(ISAGHA);
   });
 
-  it("reads sell and buy by data-unit and keeps gold 18, 21, 24 and silver 925, 999", async () => {
+  it("reads sell and buy by data-unit and keeps gold 18, 21, 24, pound and silver 925, 999", async () => {
     const stub = stubFetch();
 
     const retail = await isaghaRetail.fetchRetail();
@@ -206,6 +207,24 @@ describe("isaghaRetail", () => {
 
   it("throws a parse error for a page without rows", async () => {
     stubFetch({ gold: htmlResponse(EMPTY_PAGE) });
+
+    await expect(isaghaRetail.fetchRetail()).rejects.toMatchObject({ provider: ISAGHA, kind: "parse" });
+  });
+
+  it("page without the pound row serves the other units and goldPound is not_available", async () => {
+    const withoutPound = isaghaGold.replace(/data-unit="pound"/g, 'data-unit="unlisted"');
+    stubFetch({ gold: htmlResponse(withoutPound) });
+
+    const retail = await isaghaRetail.fetchRetail();
+
+    expect(Object.keys(retail.gold)).toEqual(["18", "21", "24"]);
+    expect(retail.gold.pound).toBeUndefined();
+    expect(retail.silver["925"]).toBeDefined();
+  });
+
+  it("throws a parse error when a required gold unit is missing from the gold page", async () => {
+    const withoutGold21 = isaghaGold.replace(/data-unit="21"/g, 'data-unit="unlisted"');
+    stubFetch({ gold: htmlResponse(withoutGold21) });
 
     await expect(isaghaRetail.fetchRetail()).rejects.toMatchObject({ provider: ISAGHA, kind: "parse" });
   });

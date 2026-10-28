@@ -14,6 +14,18 @@ export type ErrorCode =
   | "not_available"
   | "forbidden";
 
+export type Basis = "primary" | "backup" | "computed";
+export type TimeKind = "trade" | "fetched" | "close" | "period";
+
+export interface Provenance {
+  fields: string[];
+  source: string;
+  dataTime: string | null;
+  timeKind: TimeKind;
+  stale: boolean;
+  basis: Basis;
+}
+
 export interface Meta {
   label: Label;
   dataTime: string | null;
@@ -22,6 +34,7 @@ export interface Meta {
   staleReason: string | null;
   session: { date: string; status: string } | null;
   notAvailable: { field: string; reason: string }[];
+  provenance: Provenance[];
 }
 
 export const NOTICE = "Delayed, unofficial data for information only. Not investment advice.";
@@ -50,6 +63,7 @@ function errorMeta(source: string | null, label: Label): Meta {
     staleReason: null,
     session: null,
     notAvailable: [],
+    provenance: [],
   };
 }
 

@@ -1,6 +1,7 @@
 import type { CorporateActionKind } from "../domain/adjust";
-import type { SessionStatus } from "../domain/calendar";
+import { SECONDS_PER_DAY, type SessionStatus } from "../domain/calendar";
 import { sha256Hex } from "../domain/crypto";
+import type { NewIndexValue } from "./d1/bars";
 
 export type QuoteEntry = {
   t: string;
@@ -135,7 +136,10 @@ const DIRECTORY_KEY = "directory:v1";
 const STATS_KEY = "stats:v1";
 const LAST_SESSION_KEY = "snapshot:last-session";
 const PURGE_CURSOR_KEY = "oauth:purge-cursor";
+const INDEX_CLOSES_KEY_PREFIX = "snapshot:index-closes:";
 
+export const INDEX_CLOSES_RETENTION_DAYS = 5;
+const INDEX_CLOSES_TTL_SECONDS = (INDEX_CLOSES_RETENTION_DAYS + 1) * SECONDS_PER_DAY;
 const SNAPSHOT_TTL_SECONDS = 30;
 const REFERENCE_TTL_SECONDS = 300;
 const MS_PER_SECOND = 1000;
@@ -215,6 +219,22 @@ export async function putLastSessionSnapshot(env: Env, snapshot: Snapshot): Prom
 
 export function getLastSessionSnapshot(env: Env): Promise<Snapshot | null> {
   return readCached<Snapshot>(env, LAST_SESSION_KEY, REFERENCE_TTL_SECONDS);
+}
+
+function indexClosesKey(date: string): string {
+  return `${INDEX_CLOSES_KEY_PREFIX}${date}`;
+}
+
+export async function putIndexCloses(env: Env, date: string, closes: NewIndexValue[]): Promise<void> {
+  if (closes.length === 0) return;
+  await env.DATA.put(indexClosesKey(date), JSON.stringify(closes), { expirationTtl: INDEX_CLOSES_TTL_SECONDS });
+}
+
+export async function getIndexCloses(env: Env, dates: string[]): Promise<NewIndexValue[]> {
+  const stored = await Promise.all(
+    dates.map((date) => env.DATA.get<NewIndexValue[]>(indexClosesKey(date), { type: "json" })),
+  );
+  return stored.flatMap((closes) => closes ?? []);
 }
 
 export function getDirectory(env: Env): Promise<Directory | null> {

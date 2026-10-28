@@ -3,6 +3,8 @@ export const TOOL_NAMES = [
   "get_quotes",
   "get_market_overview",
   "get_indices",
+  "get_index_history",
+  "get_index_summary",
   "get_price_history",
   "compare_symbols",
   "get_movers",

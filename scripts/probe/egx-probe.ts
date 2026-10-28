@@ -16,6 +16,7 @@ const EGX_URLS = [
   "https://www.egx.com.eg/en/prices.aspx",
   "https://www.egx.com.eg/en/ListedStocks.aspx",
   "https://www.egx.com.eg/en/Indices.aspx",
+  "https://www.egx.com.eg/WebService.asmx/getIndexChartData?index=EGX30&period=30&gtk=0",
 ];
 
 const TRADINGVIEW_URL = "https://scanner.tradingview.com/egypt/scan";

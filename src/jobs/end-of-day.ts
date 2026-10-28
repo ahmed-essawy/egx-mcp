@@ -1,6 +1,7 @@
 import { loadConfig, type Config } from "../config";
 import { ADJUST_BATCH_OVERHEAD_ROWS } from "../domain/budget";
-import { cairoParts, isTradingDay, utcDay, type CairoParts } from "../domain/calendar";
+import { cairoParts, isEndOfDayDue, isTradingDay, precedingDays, utcDay, type CairoParts } from "../domain/calendar";
+import { indexClosesOf } from "../domain/index-closes";
 import { sessionQuotes, type SessionQuote } from "../domain/session-quotes";
 import { buildSymbolStats, statsWindowStart } from "../domain/stats";
 import { mubasherDailyCloses } from "../providers/mubasher";
@@ -23,7 +24,9 @@ import { getJobState, markJobOk, markJobRun } from "../store/d1/jobs";
 import { activatePending, trackListings } from "../store/d1/symbols";
 import {
   getDirectory,
+  getIndexCloses,
   getSnapshot,
+  INDEX_CLOSES_RETENTION_DAYS,
   putLastSessionSnapshot,
   putStats,
   type Directory,
@@ -35,7 +38,6 @@ import { errorMessage, jobFailedNotice } from "./errors";
 import { syncListings } from "./listing-sync";
 
 const JOB = "end_of_day";
-const RUN_FROM_TIME = "15:30";
 const SKIPPED_NO_SESSION = "skipped: no session";
 const BIG_MOVE_THRESHOLD_PCT = 5;
 const DISCREPANCY_THRESHOLD_PCT = 2;
@@ -61,8 +63,9 @@ type RunContext = {
 type Step = { name: string; source: string; run: () => Promise<void> };
 
 async function isDue(env: Env, today: CairoParts): Promise<boolean> {
-  if (today.time < RUN_FROM_TIME) return false;
-  if (!isTradingDay(today.date, await getCalendarRow(env.DB, today.date))) return false;
+  const row = await getCalendarRow(env.DB, today.date);
+  if (!isEndOfDayDue(today.time, row)) return false;
+  if (!isTradingDay(today.date, row)) return false;
   return (await getJobState(env.DB, JOB))?.lastRunDate !== today.date;
 }
 
@@ -141,19 +144,10 @@ async function writeListingTracking({ env, listedIsins }: RunContext): Promise<v
 }
 
 async function writeIndexValues({ env, snapshot, quotes, date }: RunContext): Promise<void> {
-  if (snapshot === null || quotes.length === 0) return;
-  await insertIndexValues(
-    env.DB,
-    Object.entries(snapshot.indices)
-      .filter(([, entry]) => cairoParts(entry.tt).date === date)
-      .map(([indexCode, entry]) => ({
-        indexCode,
-        sessionDate: date,
-        close: entry.v,
-        changePct: entry.chp,
-        source: entry.src,
-      })),
-  );
+  const today = snapshot === null ? [] : indexClosesOf(snapshot, date);
+  const recovered = await getIndexCloses(env, precedingDays(date, INDEX_CLOSES_RETENTION_DAYS));
+  await insertIndexValues(env.DB, [...recovered, ...today]);
+  if (quotes.length > 0 && today.length === 0) throw new Error(`no index closes for ${date}`);
 }
 
 async function writeDiscrepancies(context: RunContext, backup: BackupProvider | null): Promise<void> {

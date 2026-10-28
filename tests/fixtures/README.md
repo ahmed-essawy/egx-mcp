@@ -18,3 +18,4 @@ All captures were taken at about 14:29 Cairo time on 2026-10-25, before the clos
 | mubasher-history-COMI.csv | Last 300 lines of https://static.mubasher.info/File.MubasherCharts/File.Historical_Stock_Charts_Dir/44507230b2b03e2da37352abf1a659545b44.csv (URL from the `historical-data-url` attribute of https://english.mubasher.info/markets/EGX/stocks/COMI) | 2026-10-25 |
 | isagha-gold.html | GET https://market.isagha.com/prices | 2026-10-25 |
 | isagha-silver.html | GET https://market.isagha.com/prices/silver | 2026-10-25 |
+| mubasher-index-EGX30.csv | Last 300 lines of https://static.mubasher.info/File.MubasherCharts/File.Historical_Index_Charts_Dir/39d67d8ab4f4c10bf22aa353e27879133c.csv (URL from the `historical-data-url` attribute of https://english.mubasher.info/markets/EGX/indices/EGX30), from 2025-07-10 to 2026-10-27 | 2026-10-28 |

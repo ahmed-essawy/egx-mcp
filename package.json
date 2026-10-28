@@ -12,6 +12,7 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "backfill": "node scripts/backfill/backfill.ts",
+    "backfill:indices": "node scripts/backfill/index-history.ts",
     "check:readme": "node scripts/check-readme.ts"
   },
   "dependencies": {

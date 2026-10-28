@@ -4,8 +4,9 @@ import type { AuthProps } from "../../auth/api-keys";
 import { toCairoIso } from "../../domain/calendar";
 import { getSnapshot, type BuySell, type EgyptMetals, type FxEntry, type Snapshot, type SpotMetalEntry } from "../../store/kv";
 import { defineTool } from "../define-tool";
-import { fail, ok, type Meta } from "../envelope";
+import { fail, ok, type Meta, type Provenance } from "../envelope";
 import { envelopeSchema } from "../output-schema";
+import { groupBySource } from "../provenance";
 import { roundPrice } from "../rounding";
 import { newestDataTime } from "../shared";
 
@@ -14,9 +15,13 @@ const SNAPSHOT_MISSING_MESSAGE = "The market snapshot is not built yet.";
 const FX_MISSING_MESSAGE = "The USD/EGP rate is not available from current sources.";
 const FX_PAIR = "USDEGP";
 const FETCHED_KIND = "fetched";
-const GOLD_KARATS = ["18", "21", "24"] as const;
-const SILVER_FINENESS = ["925", "999"] as const;
+const POUND_UNIT = "EGP/piece";
 const GLOBAL_CODES = ["XAUUSD", "XAGUSD"] as const;
+const SECONDS_PER_HOUR = 3600;
+const EGYPT_RETAIL_STALE_HOURS = 26;
+const SPOT_STALE_HOURS = 72;
+const EGYPT_RETAIL_STALE_SECONDS = EGYPT_RETAIL_STALE_HOURS * SECONDS_PER_HOUR;
+const SPOT_STALE_SECONDS = SPOT_STALE_HOURS * SECONDS_PER_HOUR;
 
 const emptyInputSchema = z.object({});
 
@@ -57,16 +62,26 @@ const fxOutputSchema = envelopeSchema(
 type NotAvailable = z.infer<typeof notAvailableSchema>;
 type EgyptItem = z.infer<typeof egyptItemSchema>;
 type GlobalItem = z.infer<typeof globalItemSchema>;
-type EgyptEntries = [string, EgyptItem | NotAvailable][];
+type EgyptGroup = "gold" | "silver";
+type EgyptItemSpec = { key: string; group: EgyptGroup; unitKey: string; reportedUnit: string | null };
 
 const NOT_AVAILABLE: NotAvailable = { status: "not_available", reason: NOT_AVAILABLE_REASON };
 
-function egyptItemOf(egypt: EgyptMetals, quote: BuySell | undefined): EgyptItem | NotAvailable {
+const EGYPT_ITEMS: EgyptItemSpec[] = [
+  { key: "gold18k", group: "gold", unitKey: "18", reportedUnit: null },
+  { key: "gold21k", group: "gold", unitKey: "21", reportedUnit: null },
+  { key: "gold24k", group: "gold", unitKey: "24", reportedUnit: null },
+  { key: "goldPound", group: "gold", unitKey: "pound", reportedUnit: POUND_UNIT },
+  { key: "silver925", group: "silver", unitKey: "925", reportedUnit: null },
+  { key: "silver999", group: "silver", unitKey: "999", reportedUnit: null },
+];
+
+function egyptItemOf(egypt: EgyptMetals, quote: BuySell | undefined, reportedUnit: string | null): EgyptItem | NotAvailable {
   if (!quote) return NOT_AVAILABLE;
   return {
     buy: roundPrice(quote.buy),
     sell: roundPrice(quote.sell),
-    unit: egypt.unit,
+    unit: reportedUnit ?? egypt.unit,
     dataTime: toCairoIso(egypt.fetchedAt),
     dataTimeKind: FETCHED_KIND,
     source: egypt.src,
@@ -74,17 +89,12 @@ function egyptItemOf(egypt: EgyptMetals, quote: BuySell | undefined): EgyptItem 
 }
 
 function egyptSection(egypt: EgyptMetals | undefined): Record<string, EgyptItem | NotAvailable> {
-  const entries: EgyptEntries = [
-    ...GOLD_KARATS.map((karat): [string, EgyptItem | NotAvailable] => [
-      `gold${karat}k`,
-      egypt ? egyptItemOf(egypt, egypt.gold[karat]) : NOT_AVAILABLE,
+  return Object.fromEntries(
+    EGYPT_ITEMS.map(({ key, group, unitKey, reportedUnit }) => [
+      key,
+      egypt ? egyptItemOf(egypt, egypt[group][unitKey], reportedUnit) : NOT_AVAILABLE,
     ]),
-    ...SILVER_FINENESS.map((fineness): [string, EgyptItem | NotAvailable] => [
-      `silver${fineness}`,
-      egypt ? egyptItemOf(egypt, egypt.silver[fineness]) : NOT_AVAILABLE,
-    ]),
-  ];
-  return Object.fromEntries(entries);
+  );
 }
 
 function globalItemOf(entry: SpotMetalEntry | undefined): GlobalItem | NotAvailable {
@@ -96,29 +106,76 @@ function globalSection(metals: Snapshot["metals"]): Record<string, GlobalItem | 
   return Object.fromEntries(GLOBAL_CODES.map((code) => [code, globalItemOf(metals[code])]));
 }
 
-function metalsMeta(metals: Snapshot["metals"]): Meta {
+function isEgyptStale(egypt: EgyptMetals, now: number): boolean {
+  return now - egypt.fetchedAt > EGYPT_RETAIL_STALE_SECONDS;
+}
+
+function isSpotStale(tt: number, now: number): boolean {
+  return now - tt > SPOT_STALE_SECONDS;
+}
+
+function metalsStaleReason(egypt: EgyptMetals | undefined, staleSpots: SpotMetalEntry[], now: number): string | null {
+  if (egypt && isEgyptStale(egypt, now)) {
+    return `Egypt retail prices fetched at ${toCairoIso(egypt.fetchedAt)} are older than ${EGYPT_RETAIL_STALE_HOURS} hours.`;
+  }
+  if (staleSpots.length === 0) return null;
+  const oldest = Math.min(...staleSpots.map((spot) => spot.tt));
+  return `Spot prices dated ${toCairoIso(oldest)} are older than ${SPOT_STALE_HOURS} hours.`;
+}
+
+function metalsProvenance(egypt: EgyptMetals | undefined, spots: SpotMetalEntry[], now: number): Provenance[] {
+  const egyptEntries: Provenance[] = egypt
+    ? [
+        {
+          fields: ["egypt"],
+          source: egypt.src,
+          dataTime: toCairoIso(egypt.fetchedAt),
+          timeKind: "fetched",
+          stale: isEgyptStale(egypt, now),
+          basis: "primary",
+        },
+      ]
+    : [];
+  const spotEntries = [...groupBySource(spots, (spot) => spot.src)].map(([source, group]): Provenance => ({
+    fields: ["global"],
+    source,
+    dataTime: toCairoIso(Math.max(...group.map((spot) => spot.tt))),
+    timeKind: "trade",
+    stale: group.some((spot) => isSpotStale(spot.tt, now)),
+    basis: "primary",
+  }));
+  return [...egyptEntries, ...spotEntries];
+}
+
+function metalsMeta(metals: Snapshot["metals"], now: number): Meta {
   const spots = GLOBAL_CODES.flatMap((code) => (metals[code] ? [metals[code]] : []));
+  const staleSpots = spots.filter((spot) => isSpotStale(spot.tt, now));
+  const staleReason = metalsStaleReason(metals.egypt, staleSpots, now);
   const timestamps = [...spots.map((spot) => spot.tt), ...(metals.egypt ? [metals.egypt.fetchedAt] : [])];
   return {
     label: "delayed",
     dataTime: newestDataTime(timestamps),
     source: spots[0]?.src ?? metals.egypt?.src ?? null,
-    stale: false,
-    staleReason: null,
+    stale: staleReason !== null,
+    staleReason,
     session: null,
     notAvailable: [],
+    provenance: metalsProvenance(metals.egypt, spots, now),
   };
 }
 
-function fxMeta(entry: FxEntry): Meta {
+function fxMeta(entry: FxEntry, now: number): Meta {
+  const stale = isSpotStale(entry.tt, now);
+  const dataTime = toCairoIso(entry.tt);
   return {
     label: "delayed",
-    dataTime: toCairoIso(entry.tt),
+    dataTime,
     source: entry.src,
-    stale: false,
-    staleReason: null,
+    stale,
+    staleReason: stale ? `The USD/EGP rate dated ${dataTime} is older than ${SPOT_STALE_HOURS} hours.` : null,
     session: null,
     notAvailable: [],
+    provenance: [{ fields: ["rate"], source: entry.src, dataTime, timeKind: "trade", stale, basis: "primary" }],
   };
 }
 
@@ -135,7 +192,7 @@ function registerMetals(server: McpServer, env: Env, auth: AuthProps): void {
         const snapshot = await getSnapshot(ctx.env);
         if (snapshot === null) return fail("not_available", SNAPSHOT_MISSING_MESSAGE);
         const { metals } = snapshot;
-        return ok({ egypt: egyptSection(metals.egypt), global: globalSection(metals) }, metalsMeta(metals));
+        return ok({ egypt: egyptSection(metals.egypt), global: globalSection(metals) }, metalsMeta(metals, ctx.now));
       },
     },
     env,
@@ -158,7 +215,7 @@ function registerUsdEgp(server: McpServer, env: Env, auth: AuthProps): void {
         const entry = snapshot.fx[FX_PAIR];
         if (!entry) return fail("not_available", FX_MISSING_MESSAGE);
         const data = { rate: roundPrice(entry.v), kind: entry.kind, dataTime: toCairoIso(entry.tt), source: entry.src };
-        return ok(data, fxMeta(entry));
+        return ok(data, fxMeta(entry, ctx.now));
       },
     },
     env,

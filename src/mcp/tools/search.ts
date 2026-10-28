@@ -4,13 +4,14 @@ import type { AuthProps } from "../../auth/api-keys";
 import { toCairoIso } from "../../domain/calendar";
 import { getDirectory, type Directory, type DirectoryFund, type DirectorySymbol } from "../../store/kv";
 import { defineTool } from "../define-tool";
-import { ok, type Meta } from "../envelope";
+import { ok, type Meta, type Provenance } from "../envelope";
 import { envelopeSchema } from "../output-schema";
+import { computedProvenance, DIRECTORY_SOURCE } from "../provenance";
 import { MAX_SYMBOL_INPUT_LENGTH, searchDirectory, type SearchHit } from "../resolve";
 
 const DEFAULT_LIMIT = 10;
 const MAX_LIMIT = 20;
-const DIRECTORY_SOURCE = "directory";
+const RESULTS_FIELD = "results";
 const DIRECTORY_EMPTY_REASON = "directory not built yet";
 
 const inputSchema = z.object({
@@ -59,6 +60,11 @@ function isEmpty(directory: Directory | null): boolean {
   return directory === null || (directory.symbols.length === 0 && directory.funds.length === 0);
 }
 
+function provenanceFor(directory: Directory | null): Provenance[] {
+  if (directory === null || isEmpty(directory)) return [];
+  return [computedProvenance([RESULTS_FIELD], DIRECTORY_SOURCE, toCairoIso(directory.builtAt), "fetched", false)];
+}
+
 function metaFor(directory: Directory | null): Meta {
   return {
     label: "delayed",
@@ -68,6 +74,7 @@ function metaFor(directory: Directory | null): Meta {
     staleReason: null,
     session: null,
     notAvailable: isEmpty(directory) ? [{ field: DIRECTORY_SOURCE, reason: DIRECTORY_EMPTY_REASON }] : [],
+    provenance: provenanceFor(directory),
   };
 }
 

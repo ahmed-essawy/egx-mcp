@@ -1,7 +1,8 @@
 import { env } from "cloudflare:test";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { SECONDS_PER_DAY } from "../../src/domain/calendar";
 import { snapshotJob } from "../../src/jobs/snapshot";
-import type { QuoteEntry, Snapshot } from "../../src/store/kv";
+import { INDEX_CLOSES_RETENTION_DAYS, type QuoteEntry, type Snapshot } from "../../src/store/kv";
 import isaghaGold from "../fixtures/isagha-gold.html?raw";
 import isaghaSilver from "../fixtures/isagha-silver.html?raw";
 import mubasherListed from "../fixtures/mubasher-listed-p1.json";
@@ -40,6 +41,7 @@ import {
 import { MS_PER_SECOND, cairoSummerEpoch } from "../helpers/time";
 
 const FIXTURE_EGX30_CLOSE = 49234.3;
+const INDEX_CLOSES_KEY_PREFIX = "snapshot:index-closes:";
 const SESSION_DATE = "2026-10-25";
 const FRIDAY = "2026-10-23";
 const PREVIOUS_SESSION_DATE = "2026-10-22";
@@ -340,6 +342,27 @@ describe("snapshotJob", () => {
 
       expect(runner.kvWrites).toContain(SNAPSHOT_KEY);
       expect(runner.kvWrites).toContain(LAST_SESSION_KEY);
+      expect(runner.kvWrites).toContain(`${INDEX_CLOSES_KEY_PREFIX}${SESSION_DATE}`);
+      expect(runner.kvWrites.filter((key) => key.startsWith(INDEX_CLOSES_KEY_PREFIX))).toHaveLength(1);
+    });
+
+    it("keeps the index closes key for the retention days plus one", async () => {
+      stubFetch();
+      const putSpy = vi.spyOn(env.DATA, "put");
+
+      await createRunner().run("14:45");
+
+      const call = putSpy.mock.calls.find(([key]) => key === `${INDEX_CLOSES_KEY_PREFIX}${SESSION_DATE}`);
+      expect(call?.[2]).toEqual({ expirationTtl: (INDEX_CLOSES_RETENTION_DAYS + 1) * SECONDS_PER_DAY });
+    });
+
+    it("writes no index closes key before the window end", async () => {
+      stubFetch();
+      const runner = createRunner();
+
+      await runner.run("10:30");
+
+      expect(runner.kvWrites.filter((key) => key.startsWith(INDEX_CLOSES_KEY_PREFIX))).toEqual([]);
     });
 
     it("runs the window-end minute 13:45 on a special hours day ending 13:30", async () => {

@@ -1,9 +1,11 @@
+import { env } from "cloudflare:test";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { normalizeArabic } from "../../src/domain/arabic";
+import { toCairoIso } from "../../src/domain/calendar";
 import type { DirectoryFund } from "../../src/store/kv";
 import { clearState, restoreBindings } from "../helpers/bindings";
 import { callTool, errorCodeOf, payloadOf as structuredPayloadOf, type ToolResult } from "../helpers/mcp";
-import { seedDirectory, seedKey, seedSnapshot, seedSymbols, seedUser, setNow, stockSymbol } from "../helpers/seed";
+import { DIRECTORY_KEY, seedDirectory, seedKey, seedSnapshot, seedSymbols, seedUser, setNow, stockSymbol } from "../helpers/seed";
 import { MS_PER_SECOND } from "../helpers/time";
 
 const GIVEN_NOW = Date.UTC(2026, 9, 25, 12, 0, 0) / MS_PER_SECOND;
@@ -20,7 +22,12 @@ const MAX_LIMIT = 20;
 const OVER_LIMIT = 21;
 
 type SearchResult = Record<string, unknown> & { type: string };
-type SearchMeta = { label: string; source: string | null; notAvailable: { field: string }[] };
+type SearchMeta = {
+  label: string;
+  source: string | null;
+  notAvailable: { field: string }[];
+  provenance: Record<string, unknown>[];
+};
 type SearchPayload = { data: { results: SearchResult[] }; meta: SearchMeta };
 
 function fund(fundId: string, nameAr: string, nameEn: string | null, manager: string | null): DirectoryFund {
@@ -93,6 +100,23 @@ describe("search contract", () => {
       expect(meta.source).toBe("directory");
     });
 
+    it("reports the directory as a computed value fetched when it was built", async () => {
+      const directory = (await env.DATA.get(DIRECTORY_KEY, "json")) as { builtAt: number };
+
+      const { meta } = payloadOf(await search(key, { query: COMI_TICKER }));
+
+      expect(meta.provenance).toEqual([
+        {
+          fields: ["results"],
+          source: "directory",
+          dataTime: toCairoIso(directory.builtAt),
+          timeKind: "fetched",
+          stale: false,
+          basis: "computed",
+        },
+      ]);
+    });
+
     it("returns identical results for an Arabic query with and without the hamza", async () => {
       const plain = resultsOf(await search(key, { query: CEMENT_QUERY_PLAIN }));
       const hamza = resultsOf(await search(key, { query: CEMENT_QUERY_HAMZA }));
@@ -135,6 +159,16 @@ describe("search contract", () => {
     });
   });
 
+  describe("missing directory", () => {
+    it("reports no provenance", async () => {
+      await env.DATA.delete(DIRECTORY_KEY);
+
+      const { meta } = payloadOf(await search(key, { query: COMI_TICKER }));
+
+      expect(meta.provenance).toEqual([]);
+    });
+  });
+
   describe("empty directory", () => {
     it("returns no results and names the directory as not available", async () => {
       await seedDirectory();
@@ -143,6 +177,14 @@ describe("search contract", () => {
 
       expect(data.results).toEqual([]);
       expect(meta.notAvailable.map((entry) => entry.field)).toContain("directory");
+    });
+
+    it("reports no provenance", async () => {
+      await seedDirectory();
+
+      const { meta } = payloadOf(await search(key, { query: COMI_TICKER }));
+
+      expect(meta.provenance).toEqual([]);
     });
   });
 });

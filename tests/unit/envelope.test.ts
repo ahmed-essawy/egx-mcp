@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { fail, ok, toCairoIso, type Meta } from "../../src/mcp/envelope";
+import { metaSchema } from "../../src/mcp/output-schema";
 
 const EXPECTED_NOTICE = "Delayed, unofficial data for information only. Not investment advice.";
 const RETRY_AT = "2026-10-25T11:30:00+03:00";
@@ -12,6 +13,7 @@ const META: Meta = {
   staleReason: null,
   session: { date: "2026-10-25", status: "open" },
   notAvailable: [],
+  provenance: [],
 };
 
 function parseSingleText(content: readonly { type: string; text?: string }[]): unknown {
@@ -54,6 +56,7 @@ const ERROR_META: Meta = {
   staleReason: null,
   session: null,
   notAvailable: [],
+  provenance: [],
 };
 
 describe("fail", () => {
@@ -118,5 +121,24 @@ describe("toCairoIso", () => {
 
   it("uses +02:00 after summer time ends", () => {
     expect(toCairoIso(1793520000)).toBe("2026-11-01T10:00:00+02:00");
+  });
+});
+
+describe("metaSchema provenance", () => {
+  const entry = {
+    fields: ["close"],
+    source: "tradingview",
+    dataTime: "2026-10-25",
+    timeKind: "period",
+    stale: false,
+    basis: "computed",
+  };
+
+  it("accepts an entry with timeKind period", () => {
+    expect(() => metaSchema.parse({ ...META, provenance: [entry] })).not.toThrow();
+  });
+
+  it("rejects an entry with no fields", () => {
+    expect(() => metaSchema.parse({ ...META, provenance: [{ ...entry, fields: [] }] })).toThrow();
   });
 });

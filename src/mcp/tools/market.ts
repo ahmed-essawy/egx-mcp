@@ -20,8 +20,17 @@ import {
   type SymbolStats,
 } from "../../store/kv";
 import { defineTool } from "../define-tool";
-import { fail, ok, type Meta } from "../envelope";
+import { fail, ok, type Meta, type Provenance } from "../envelope";
 import { envelopeSchema } from "../output-schema";
+import {
+  STORED_BARS_SOURCE,
+  closeProvenance,
+  computedProvenance,
+  indexProvenance,
+  groupBySource,
+  primaryStockSource,
+  quoteProvenance,
+} from "../provenance";
 import { MAX_SYMBOL_INPUT_LENGTH } from "../resolve";
 import { roundIndex, roundPercent, roundPrice, roundTurnover } from "../rounding";
 import { loadMarketClock, sessionMeta, type MarketClock } from "../session";
@@ -48,6 +57,9 @@ const SNAPSHOT_MISSING_MESSAGE = "The market snapshot is not built yet.";
 const LAST_SESSION_MISSING_MESSAGE = "No completed session snapshot is stored yet.";
 const NOT_AVAILABLE_REASON = "not available from current sources";
 const INVESTOR_STATS_FIELD = "investorStats";
+const INDICES_FIELDS = ["indices"];
+const OVERVIEW_MOVER_FIELDS = ["breadth", "totals", "topGainers", "topLosers", "mostActiveByVolume", "mostActiveByValue"];
+const SUMMARY_MOVER_FIELDS = ["breadth", "totals", "topGainers", "topLosers"];
 
 const moverSchema = identitySchema.extend({
   price: z.number(),
@@ -172,11 +184,15 @@ function lookupIndex(code: IndexCode, snapshot: Snapshot): IndexItem | IndexUnav
   return indexItemOf(code, entry);
 }
 
-function availableIndices(snapshot: Snapshot): IndexItem[] {
-  return INDEX_CODES.flatMap((code) => {
+function availableIndexEntries(snapshot: Snapshot): [IndexCode, IndexEntry][] {
+  return INDEX_CODES.flatMap((code): [IndexCode, IndexEntry][] => {
     const entry = snapshot.indices[code];
-    return entry ? [indexItemOf(code, entry)] : [];
+    return entry ? [[code, entry]] : [];
   });
+}
+
+function availableIndices(snapshot: Snapshot): IndexItem[] {
+  return availableIndexEntries(snapshot).map(([code, entry]) => indexItemOf(code, entry));
 }
 
 function requestedIndices(names: string[]): RequestedIndex[] {
@@ -200,16 +216,47 @@ function snapshotTimestamps(snapshot: Snapshot): number[] {
   return [...Object.values(snapshot.quotes), ...Object.values(snapshot.indices)].map((entry) => entry.tt);
 }
 
-function marketMeta(label: Meta["label"], snapshot: Snapshot, session: Meta["session"], notAvailable: Meta["notAvailable"]): Meta {
+function snapshotDataTime(snapshot: Snapshot): string | null {
+  return newestDataTime(snapshotTimestamps(snapshot));
+}
+
+function marketMeta(
+  label: Meta["label"],
+  snapshot: Snapshot,
+  session: Meta["session"],
+  notAvailable: Meta["notAvailable"],
+  provenance: Provenance[],
+): Meta {
   return {
     label,
-    dataTime: newestDataTime(snapshotTimestamps(snapshot)),
+    dataTime: snapshotDataTime(snapshot),
     source: snapshot.sources.stocks,
     stale: false,
     staleReason: null,
     session,
     notAvailable,
+    provenance,
   };
+}
+
+function overviewProvenance(snapshot: Snapshot): Provenance[] {
+  const entries = availableIndexEntries(snapshot).map(([, entry]) => entry);
+  return [
+    ...indexProvenance(INDICES_FIELDS, entries),
+    computedProvenance(OVERVIEW_MOVER_FIELDS, snapshot.sources.stocks, snapshotDataTime(snapshot), "trade", false),
+  ];
+}
+
+function summaryProvenance(snapshot: Snapshot): Provenance[] {
+  const date = snapshot.session.date;
+  const rows = availableIndexEntries(snapshot).map(([, entry]) => ({ date: cairoParts(entry.tt).date, source: entry.src }));
+  const indices = [...groupBySource(rows, (row) => row.source).values()].flatMap((group) =>
+    closeProvenance(INDICES_FIELDS, group, group.some((row) => row.date !== date)),
+  );
+  return [
+    ...indices,
+    computedProvenance(SUMMARY_MOVER_FIELDS, snapshot.sources.stocks, date, "close", false),
+  ];
 }
 
 function indicesMeta(entries: IndexEntry[], session: Meta["session"]): Meta {
@@ -221,6 +268,7 @@ function indicesMeta(entries: IndexEntry[], session: Meta["session"]): Meta {
     staleReason: null,
     session,
     notAvailable: [],
+    provenance: indexProvenance(INDICES_FIELDS, entries),
   };
 }
 
@@ -251,7 +299,7 @@ function registerOverview(server: McpServer, env: Env, auth: AuthProps): void {
             mostActiveByValue: moversOf(snapshot.top.byValue, top, snapshot, symbols),
             investorStats: null,
           },
-          marketMeta("delayed", snapshot, session, [{ field: INVESTOR_STATS_FIELD, reason: NOT_AVAILABLE_REASON }]),
+          marketMeta("delayed", snapshot, session, [{ field: INVESTOR_STATS_FIELD, reason: NOT_AVAILABLE_REASON }], overviewProvenance(snapshot)),
         );
       },
     },
@@ -303,7 +351,7 @@ function registerDailySummary(server: McpServer, env: Env, auth: AuthProps): voi
         const symbols = symbolsByIsin(directory);
         return ok(
           sessionSummary(snapshot, SUMMARY_TOP, symbols),
-          marketMeta("end_of_day", snapshot, { date: snapshot.session.date, status: CLOSED_STATUS }, []),
+          marketMeta("end_of_day", snapshot, { date: snapshot.session.date, status: CLOSED_STATUS }, [], summaryProvenance(snapshot)),
         );
       },
     },
@@ -319,6 +367,8 @@ const MAX_RANGE_SYMBOLS = 20;
 const UNUSUAL_VOLUME_FACTOR = 2;
 const PERCENT_FACTOR = 100;
 const STATS_MISSING_MESSAGE = "The 52-week statistics are not available: stats not built yet.";
+const MOVERS_FIELDS = ["items"];
+const SECTORS_FIELDS = ["sectors"];
 const SNAPSHOT_MOVER_KINDS = ["gainers", "losers", "volume", "value"] as const;
 const STATS_MOVER_KINDS = ["unusual_volume", "near_52w_high", "near_52w_low"] as const;
 const SECTOR_PERIODS = ["1d", "1w", "1m", "3m", "ytd", "1y"] as const;
@@ -502,7 +552,13 @@ function statsMoverItem(kind: StatsMoverKind, symbol: StatsSymbol, symbols: Symb
   }
 }
 
-function moversMeta(quotes: QuoteEntry[], snapshot: Snapshot, clock: MarketClock, notAvailable: Meta["notAvailable"]): Meta {
+function moversMeta(
+  quotes: QuoteEntry[],
+  snapshot: Snapshot,
+  clock: MarketClock,
+  notAvailable: Meta["notAvailable"],
+  provenance: Provenance[],
+): Meta {
   const staleReason = staleReasonOf(quotes, clock);
   return {
     label: "delayed",
@@ -512,7 +568,12 @@ function moversMeta(quotes: QuoteEntry[], snapshot: Snapshot, clock: MarketClock
     staleReason,
     session: sessionMeta(clock, snapshot),
     notAvailable,
+    provenance,
   };
+}
+
+function storedBarsProvenance(fields: string[], stats: Stats): Provenance {
+  return computedProvenance(fields, STORED_BARS_SOURCE, stats.asOf, "close", false);
 }
 
 function registerMovers(server: McpServer, env: Env, auth: AuthProps): void {
@@ -538,14 +599,17 @@ function registerMovers(server: McpServer, env: Env, auth: AuthProps): void {
         if (isSnapshotKind(kind)) {
           const picked = snapshotKindMovers(kind, snapshot, limit);
           const items = picked.map(({ isin, quote }) => moverFrom(isin, quote, symbols));
-          return ok({ items }, moversMeta(picked.map(({ quote }) => quote), snapshot, clock, []));
+          const quotes = picked.map(({ quote }) => quote);
+          return ok({ items }, moversMeta(quotes, snapshot, clock, [], quoteProvenance(MOVERS_FIELDS, quotes, primaryStockSource(ctx.cfg), clock)));
         }
         if (stats === null) return fail("not_available", STATS_MISSING_MESSAGE, { source: snapshot.sources.stocks });
         const today = clock.today;
         const picked = statsKindMovers(kind, statsSymbols(snapshot, stats), limit);
         const items = picked.map((symbol) => statsMoverItem(kind, symbol, symbols, today));
         const pending = kind === "unusual_volume" ? [] : picked.map((symbol) => pendingEntryOf(symbol.stats, today));
-        return ok({ items }, moversMeta(picked.map(({ quote }) => quote), snapshot, clock, adjustedNotAvailable(pending)));
+        const quotes = picked.map(({ quote }) => quote);
+        const provenance = [...quoteProvenance(MOVERS_FIELDS, quotes, primaryStockSource(ctx.cfg), clock), storedBarsProvenance(MOVERS_FIELDS, stats)];
+        return ok({ items }, moversMeta(quotes, snapshot, clock, adjustedNotAvailable(pending), provenance));
       },
     },
     env,
@@ -603,7 +667,10 @@ function registerRange(server: McpServer, env: Env, auth: AuthProps): void {
         const quotes = served.flatMap(({ quote }) => (quote ? [quote] : []));
         return ok(
           { items: served.map(({ result }) => result) },
-          moversMeta(quotes, snapshot, clock, adjustedNotAvailable(served.map(({ pending }) => pending))),
+          moversMeta(quotes, snapshot, clock, adjustedNotAvailable(served.map(({ pending }) => pending)), [
+            ...quoteProvenance(MOVERS_FIELDS, quotes, primaryStockSource(ctx.cfg), clock),
+            storedBarsProvenance(MOVERS_FIELDS, stats),
+          ]),
         );
       },
     },
@@ -636,7 +703,7 @@ function sectorItemOf(sector: string, members: SectorMember[]): SectorItem {
   };
 }
 
-function sectorMeta(notAvailable: Meta["notAvailable"]): Meta {
+function sectorMeta(notAvailable: Meta["notAvailable"], provenance: Provenance[]): Meta {
   return {
     label: "end_of_day",
     dataTime: null,
@@ -645,6 +712,7 @@ function sectorMeta(notAvailable: Meta["notAvailable"]): Meta {
     staleReason: null,
     session: null,
     notAvailable,
+    provenance,
   };
 }
 
@@ -665,7 +733,8 @@ function registerSectorPerformance(server: McpServer, env: Env, auth: AuthProps)
         const sectors = [...members].map(([sector, list]) => sectorItemOf(sector, list));
         sectors.sort((a, b) => b.medianReturnPct - a.medianReturnPct || compareText(a.sector, b.sector));
         const pending = [...members.values()].flat().map((member) => member.pending);
-        return ok({ sectors }, sectorMeta(adjustedNotAvailable(pending)));
+        const provenance = sectors.length > 0 ? [storedBarsProvenance(SECTORS_FIELDS, stats)] : [];
+        return ok({ sectors }, sectorMeta(adjustedNotAvailable(pending), provenance));
       },
     },
     env,

@@ -261,6 +261,8 @@ describe("createServer", () => {
       "get_movers",
       "get_52_week_range",
       "get_sector_performance",
+      "get_index_history",
+      "get_index_summary",
       "get_metals",
       "get_usd_egp",
       "portfolio_get",

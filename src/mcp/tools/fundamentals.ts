@@ -15,8 +15,9 @@ import {
 import { getProfile } from "../../store/d1/symbols";
 import { getSnapshot, type Directory, type QuoteEntry } from "../../store/kv";
 import { defineTool, type ToolContext } from "../define-tool";
-import { fail, ok, type Label, type Meta } from "../envelope";
+import { fail, ok, toCairoIso, type Label, type Meta, type Provenance } from "../envelope";
 import { envelopeSchema } from "../output-schema";
+import { computedProvenance, groupBySource, SYMBOL_MASTER_SOURCE } from "../provenance";
 import { resolveSymbol } from "../resolve";
 import { roundPrice } from "../rounding";
 import { loadMarketClock, type MarketClock } from "../session";
@@ -113,12 +114,42 @@ type NotAvailable = Meta["notAvailable"][number];
 type ActionItem = z.infer<typeof actionsOutputSchema>["data"]["items"][number];
 type Ratio = z.infer<typeof ratioSchema>;
 
+const PROFILE_FIELDS = [
+  "sector",
+  "market",
+  "sharesOutstanding",
+  "freeFloatShares",
+  "firstTradeDate",
+  "indexCodes",
+  "status",
+];
+
 const PROFILE_GAPS: NotAvailable[] = ["listingDate", "indexMembership"].map((field) => ({
   field,
   reason: NOT_AVAILABLE_REASON,
 }));
 
-function metaOf(sources: string[], notAvailable: NotAvailable[] = []): Meta {
+function newestDate(dates: readonly (string | null)[]): string | null {
+  return dates.reduce<string | null>((newest, date) => (date !== null && (newest === null || date > newest) ? date : newest), null);
+}
+
+function periodProvenance<T>(
+  fields: string[],
+  items: readonly T[],
+  sourceOf: (item: T) => string,
+  dateOf: (item: T) => string | null,
+): Provenance[] {
+  return [...groupBySource(items, sourceOf)].map(([source, group]) => ({
+    fields,
+    source,
+    dataTime: newestDate(group.map(dateOf)),
+    timeKind: "period",
+    stale: false,
+    basis: "primary",
+  }));
+}
+
+function metaOf(sources: string[], notAvailable: NotAvailable[], provenance: Provenance[]): Meta {
   const distinct = [...new Set(sources)];
   return {
     label: LABEL,
@@ -128,6 +159,7 @@ function metaOf(sources: string[], notAvailable: NotAvailable[] = []): Meta {
     staleReason: null,
     session: null,
     notAvailable,
+    provenance,
   };
 }
 
@@ -163,7 +195,14 @@ function actionItem(action: CorporateAction, tickers: ReadonlyMap<string, string
 async function actionsResult(ctx: ToolContext, directory: Directory, filter: ActionFilter) {
   const actions = await counted(ctx.rows, listActions(ctx.env.DB, filter));
   const tickers = tickerLookup(directory);
-  return ok({ items: actions.map((action) => actionItem(action, tickers)) }, metaOf(actions.map(({ source }) => source)));
+  return ok(
+    { items: actions.map((action) => actionItem(action, tickers)) },
+    metaOf(
+      actions.map(({ source }) => source),
+      [],
+      periodProvenance(["items"], actions, ({ source }) => source, ({ exDate }) => exDate),
+    ),
+  );
 }
 
 function newerFetch(a: Figure, b: Figure): Figure {
@@ -188,13 +227,14 @@ function latestFigure(figures: Figure[], metric: string): Figure | null {
 
 function financialsMeta(figures: Figure[], quotes: QuoteEntry[], clock: MarketClock): Meta {
   const staleReason = staleReasonOf(quotes, clock);
+  const stale = staleReason !== null;
   return {
-    ...metaOf(
-      figures.map(({ source }) => source),
-      financialsGaps(figures),
-    ),
+    ...metaOf(figures.map(({ source }) => source), financialsGaps(figures), [
+      ...periodProvenance(["figures"], figures, ({ source }) => source, ({ periodEnd }) => periodEnd),
+      ...quotes.map((quote) => computedProvenance(["ratios"], quote.src, toCairoIso(quote.tt), "trade", stale)),
+    ]),
     dataTime: newestDataTime(quotes.map(({ tt }) => tt)),
-    stale: staleReason !== null,
+    stale,
     staleReason,
   };
 }
@@ -246,7 +286,9 @@ function registerGetCompanyProfile(server: McpServer, env: Env, auth: AuthProps)
             indexCodes: profile.indexCodes,
             status: profile.status,
           },
-          metaOf([], PROFILE_GAPS),
+          metaOf([], PROFILE_GAPS, [
+            computedProvenance(PROFILE_FIELDS, SYMBOL_MASTER_SOURCE, toCairoIso(profile.updatedAt), "fetched", false),
+          ]),
         );
       },
     },

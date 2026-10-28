@@ -7,8 +7,9 @@ import { normalizeArabic } from "../../src/domain/arabic";
 import { generateApiKey, hashApiKey } from "../../src/auth/api-keys";
 import { createApiKey, upsertUserByGoogleSub } from "../../src/store/d1/users";
 
-const DEFAULT_SESSION_DATE = "2026-10-25";
-const DEFAULT_GENERATED_AT = 1_793_000_000;
+import { DEFAULT_GENERATED_AT, DEFAULT_SESSION_DATE, defaultSnapshot } from "./snapshot-fixture";
+
+export { defaultSnapshot };
 const GOOGLE_SUB_PREFIX = "sub-";
 export const SNAPSHOT_KEY = "snapshot:v1";
 export const DIRECTORY_KEY = "directory:v1";
@@ -38,30 +39,6 @@ export function syntheticIsin(index: number): string {
 
 export function syntheticTicker(index: number): string {
   return `S${String(index).padStart(3, "0")}`;
-}
-
-export function defaultSnapshot(): Snapshot {
-  return {
-    v: 1,
-    generatedAt: DEFAULT_GENERATED_AT,
-    session: {
-      date: DEFAULT_SESSION_DATE,
-      status: "open",
-      tz: "Africa/Cairo",
-      opensAt: "10:00",
-      closesAt: "14:30",
-      noTradesToday: false,
-    },
-    delay: { label: "delayed", minutes: 15 },
-    sources: { stocks: "tradingview", primaryFailed: false },
-    quotes: {},
-    indices: {},
-    fx: {},
-    metals: {},
-    breadth: { advancers: 0, decliners: 0, unchanged: 0 },
-    totals: { volume: 0, value: 0 },
-    top: { gainers: [], losers: [], byVolume: [], byValue: [] },
-  };
 }
 
 function defaultDirectory(): Directory {

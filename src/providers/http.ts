@@ -1,7 +1,5 @@
+import { PROVIDER_TIMEOUT_MS, USER_AGENT } from "./request-defaults";
 import { ProviderError } from "./types";
-
-const PROVIDER_TIMEOUT_MS = 8000;
-const USER_AGENT = "egx-mcp/1.0 (+https://github.com/ahmed-essawy/egx-mcp)";
 
 export async function fetchJson(providerId: string, url: string, init?: RequestInit): Promise<unknown> {
   const text = await fetchText(providerId, url, init);

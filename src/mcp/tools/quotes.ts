@@ -14,6 +14,7 @@ import {
 import { defineTool } from "../define-tool";
 import { fail, ok, type Meta } from "../envelope";
 import { envelopeSchema } from "../output-schema";
+import { primaryStockSource, quoteProvenance } from "../provenance";
 import { MAX_SYMBOL_INPUT_LENGTH, resolveSymbol } from "../resolve";
 import { roundPercent, roundPrice, roundTurnover } from "../rounding";
 import { loadMarketClock, sessionMeta, type MarketClock } from "../session";
@@ -29,6 +30,7 @@ import {
 
 const MIN_SYMBOLS = 1;
 const MAX_SYMBOLS = 20;
+const QUOTES_FIELDS = ["quotes"];
 
 const inputSchema = z.object({
   symbols: z.array(z.string().min(1).max(MAX_SYMBOL_INPUT_LENGTH)).min(MIN_SYMBOLS).max(MAX_SYMBOLS),
@@ -112,7 +114,7 @@ function serveInput(input: string, directory: Directory, snapshot: Snapshot | nu
   return { item, quote: null };
 }
 
-function metaFor(quotes: QuoteEntry[], snapshot: Snapshot | null, clock: MarketClock): Meta {
+function metaFor(quotes: QuoteEntry[], snapshot: Snapshot | null, clock: MarketClock, primarySource: string): Meta {
   const staleReason = staleReasonOf(quotes, clock);
   return {
     label: "delayed",
@@ -122,6 +124,7 @@ function metaFor(quotes: QuoteEntry[], snapshot: Snapshot | null, clock: MarketC
     staleReason,
     session: sessionMeta(clock, snapshot),
     notAvailable: snapshot ? [] : [{ field: SNAPSHOT_FIELD, reason: SNAPSHOT_MISSING_REASON }],
+    provenance: snapshot ? quoteProvenance(QUOTES_FIELDS, quotes, primarySource, clock) : [],
   };
 }
 
@@ -143,7 +146,7 @@ export function registerQuoteTools(server: McpServer, env: Env, auth: AuthProps)
         if (directory === null) return fail("not_available", DIRECTORY_MISSING_MESSAGE, { source: snapshot?.sources.stocks });
         const served = symbols.map((input) => serveInput(input, directory, snapshot, clock));
         const quotes = served.flatMap(({ quote }) => (quote ? [quote] : []));
-        return ok({ quotes: served.map(({ item }) => item) }, metaFor(quotes, snapshot, clock));
+        return ok({ quotes: served.map(({ item }) => item) }, metaFor(quotes, snapshot, clock, primaryStockSource(ctx.cfg)));
       },
     },
     env,

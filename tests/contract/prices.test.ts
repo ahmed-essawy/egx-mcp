@@ -14,12 +14,13 @@ const NOT_AVAILABLE_REASON = "not available from current sources";
 const EGYPT_SOURCE = "isagha";
 const MARKET_SOURCE = "tradingview";
 const EGYPT_UNIT = "EGP/g";
+const POUND_UNIT = "EGP/piece";
 const SPOT_UNIT = "USD/oz";
 const FETCHED_AT = cairoSummerEpoch("2026-10-25", "11:45");
 const FETCHED_AT_ISO = "2026-10-25T11:45:00+03:00";
 const TICK_TIME = cairoSummerEpoch("2026-10-25", "11:58");
 const TICK_TIME_ISO = "2026-10-25T11:58:00+03:00";
-const EGYPT_KEYS = ["gold18k", "gold21k", "gold24k", "silver925", "silver999"];
+const EGYPT_KEYS = ["gold18k", "gold21k", "gold24k", "goldPound", "silver925", "silver999"];
 const SEEDED_EGYPT = {
   src: EGYPT_SOURCE,
   fetchedAt: FETCHED_AT,
@@ -28,6 +29,7 @@ const SEEDED_EGYPT = {
     "18": { buy: 5360, sell: 5400 },
     "21": { buy: 6255, sell: 6300 },
     "24": { buy: 7150, sell: 7200 },
+    pound: { buy: 50040, sell: 50400 },
   },
   silver: {
     "925": { buy: 80, sell: 85 },
@@ -38,6 +40,7 @@ const EXPECTED_EGYPT: Record<string, { buy: number; sell: number }> = {
   gold18k: SEEDED_EGYPT.gold["18"],
   gold21k: SEEDED_EGYPT.gold["21"],
   gold24k: SEEDED_EGYPT.gold["24"],
+  goldPound: SEEDED_EGYPT.gold.pound,
   silver925: SEEDED_EGYPT.silver["925"],
   silver999: SEEDED_EGYPT.silver["999"],
 };
@@ -46,6 +49,7 @@ const SILVER_SPOT = 48.25;
 const USD_EGP_RATE = 48.52;
 const UNROUNDED_RATE = 48.523456;
 const ROUNDED_RATE = 48.5235;
+const STALE_EGYPT_AGE_SECONDS = 27 * 3600;
 const NOTICE = "Delayed, unofficial data for information only. Not investment advice.";
 
 type Item = Record<string, unknown>;
@@ -55,7 +59,7 @@ type MetalsPayload = {
   notice: string;
 };
 type FxPayload = { data: Item; meta: Meta; notice: string };
-type Meta = { label: string; dataTime: string | null; source: string | null };
+type Meta = { label: string; dataTime: string | null; source: string | null; stale: boolean; staleReason: string | null };
 
 function spot(value: number) {
   return { v: value, unit: SPOT_UNIT, tt: TICK_TIME, src: MARKET_SOURCE };
@@ -100,7 +104,7 @@ describe("prices contract", () => {
 
       expect(data.egypt[name]).toEqual({
         ...EXPECTED_EGYPT[name],
-        unit: EGYPT_UNIT,
+        unit: name === "goldPound" ? POUND_UNIT : EGYPT_UNIT,
         dataTime: FETCHED_AT_ISO,
         dataTimeKind: "fetched",
         source: EGYPT_SOURCE,
@@ -157,6 +161,16 @@ describe("prices contract", () => {
       }
     });
 
+    it("returns goldPound as not_available and keeps the other Egypt items when the pound is missing", async () => {
+      const { pound: _pound, ...goldWithoutPound } = SEEDED_EGYPT.gold;
+      await seedSnapshot({ metals: { ...globalMetals(), egypt: { ...SEEDED_EGYPT, gold: goldWithoutPound } } });
+
+      const { data } = await metalsFor(key);
+
+      expect(data.egypt.goldPound).toEqual({ status: "not_available", reason: NOT_AVAILABLE_REASON });
+      expect(data.egypt.gold24k).toMatchObject(SEEDED_EGYPT.gold["24"]);
+    });
+
     it("keeps the global spot prices when metals.egypt is absent", async () => {
       await seedSnapshot(pricesSnapshot(false));
 
@@ -164,6 +178,18 @@ describe("prices contract", () => {
 
       expect(data.global.XAUUSD).toMatchObject({ value: GOLD_SPOT, source: MARKET_SOURCE });
       expect(data.global.XAGUSD).toMatchObject({ value: SILVER_SPOT, source: MARKET_SOURCE });
+    });
+  });
+
+  describe("get_metals staleness", () => {
+    it("is stale with the egypt reason when the egypt prices are 27 hours old", async () => {
+      const fetchedAt = NOW - STALE_EGYPT_AGE_SECONDS;
+      await seedSnapshot({ metals: { ...globalMetals(), egypt: { ...SEEDED_EGYPT, fetchedAt } } });
+
+      const { meta } = await metalsFor(key);
+
+      expect(meta.stale).toBe(true);
+      expect(meta.staleReason).toContain("Egypt retail prices fetched at");
     });
   });
 
