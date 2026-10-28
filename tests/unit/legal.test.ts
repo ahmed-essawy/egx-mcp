@@ -62,6 +62,9 @@ const PRIVACY_FACTS = [
   "__Host-egx_session",
   "under 18",
   "30 days",
+  "Delete account",
+  "Cloudflare KV",
+  "24 hours",
   'href="/terms"',
 ];
 
@@ -123,6 +126,14 @@ describe("privacyView", () => {
 
   it("follows the shared page rules", () => {
     expectBasePageRules(html);
+  });
+});
+
+describe("privacyView account deletion", () => {
+  const html = privacyView();
+
+  it("no longer defers deletion to a future button", () => {
+    expect(html).not.toContain("until a delete button is available");
   });
 });
 

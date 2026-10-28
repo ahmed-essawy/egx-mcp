@@ -93,6 +93,7 @@ const PRIVACY_SECTIONS: LegalSection[] = [
     paragraphs: [
       "Your account and API key records are kept until your account is deleted. If you use the portfolio and price-level features, your holdings and price levels are kept until your account is deleted.",
       "Daily usage counters are kept for operating the limits, and we aim to delete them after 90 days. Sign-in sessions last 12 hours. Cloudflare keeps its own logs under its own policy.",
+      "When an AI assistant connects with Google sign-in (OAuth), we keep the grant and token records for that connection in Cloudflare KV. Access tokens last 24 hours, and the grant and its tokens are revoked and removed when you delete your account.",
     ],
   },
   {
@@ -100,7 +101,7 @@ const PRIVACY_SECTIONS: LegalSection[] = [
     title: "Your choices and account deletion",
     paragraphs: [
       "In the dashboard you can see your email, your keys and today's usage, and you can revoke keys. You can remove the app's access in your Google account settings.",
-      `To delete your account and all its data, email ${CONTACT_LINK} from the address of the account. We handle requests within 30 days. This applies until a delete button is available in the dashboard.`,
+      `To delete your account and all its data, use the "Delete account" button in the dashboard and type your email address to confirm. Deleting removes your account, keys, holdings, price levels and usage records, and revokes your OAuth grants. If you cannot use the dashboard, email ${CONTACT_LINK} from the address of the account and we handle the request within 30 days.`,
     ],
   },
   {

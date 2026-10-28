@@ -42,7 +42,11 @@ function stubServer(): { server: McpServer; registered: Registration[] } {
   return { server: { registerTool } as unknown as McpServer, registered };
 }
 
-function define(server: McpServer, handler: (args: { symbol: string }, ctx: ToolContext) => Promise<typeof TOOL_RESULT>) {
+function define(
+  server: McpServer,
+  handler: (args: { symbol: string }, ctx: ToolContext) => Promise<typeof TOOL_RESULT>,
+  options: { readOnly?: boolean; auth?: AuthProps } = {},
+) {
   defineTool(
     server,
     {
@@ -50,11 +54,11 @@ function define(server: McpServer, handler: (args: { symbol: string }, ctx: Tool
       description: "Search symbols.",
       inputSchema: z.object({ symbol: z.string() }),
       outputSchema: z.object({}),
-      readOnly: true,
+      readOnly: options.readOnly ?? true,
       handler,
     },
     ENV,
-    AUTH,
+    options.auth ?? AUTH,
   );
 }
 
@@ -126,6 +130,48 @@ describe("defineTool", () => {
     expect(result.structuredContent.error.code).toBe("invalid_input");
     expect(handler).not.toHaveBeenCalled();
     expect(mocks.checkLimits).not.toHaveBeenCalled();
+  });
+
+  describe("scopes", () => {
+    const READ_ONLY_AUTH: AuthProps = { ...AUTH, via: "oauth", scopes: ["mcp:read"] };
+    const FULL_AUTH: AuthProps = { ...AUTH, via: "oauth", scopes: ["mcp:read", "mcp:write"] };
+
+    it("refuses a write tool without mcp:write before any limit check, handler or accounting", async () => {
+      const { server, registered } = stubServer();
+      const handler = vi.fn(async () => TOOL_RESULT);
+      define(server, handler, { readOnly: false, auth: READ_ONLY_AUTH });
+      const result = (await registered[0]?.callback({ symbol: "COMI" })) as {
+        isError: boolean;
+        structuredContent: { error: { code: string } };
+      };
+      expect(result.isError).toBe(true);
+      expect(result.structuredContent.error.code).toBe("forbidden");
+      expect(handler).not.toHaveBeenCalled();
+      expect(mocks.checkLimits).not.toHaveBeenCalled();
+      expect(mocks.finishCall).not.toHaveBeenCalled();
+    });
+
+    it("serves a read-only tool with mcp:read alone", async () => {
+      const { server, registered } = stubServer();
+      const handler = vi.fn(async () => TOOL_RESULT);
+      define(server, handler, { readOnly: true, auth: READ_ONLY_AUTH });
+      const result = await registered[0]?.callback({ symbol: "COMI" });
+      expect(result).toBe(TOOL_RESULT);
+      expect(handler).toHaveBeenCalledTimes(1);
+      expect(mocks.checkLimits).toHaveBeenCalledTimes(1);
+      expect(mocks.finishCall).toHaveBeenCalledTimes(1);
+    });
+
+    it("serves both a write tool and a read-only tool with both scopes", async () => {
+      const { server, registered } = stubServer();
+      const handler = vi.fn(async () => TOOL_RESULT);
+      define(server, handler, { readOnly: false, auth: FULL_AUTH });
+      define(server, handler, { readOnly: true, auth: FULL_AUTH });
+      expect(await registered[0]?.callback({ symbol: "COMI" })).toBe(TOOL_RESULT);
+      expect(await registered[1]?.callback({ symbol: "COMI" })).toBe(TOOL_RESULT);
+      expect(handler).toHaveBeenCalledTimes(2);
+      expect(mocks.finishCall).toHaveBeenCalledTimes(2);
+    });
   });
 
   describe("failures", () => {

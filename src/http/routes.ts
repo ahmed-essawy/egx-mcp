@@ -1,15 +1,17 @@
 import { resolvePublicOrigin } from "../config";
+import { authorizeDecisionHandler, authorizeHandler, googleCallbackHandler } from "./authorize";
 import {
   callbackHandler,
   createKeyHandler,
   dashboardHandler,
+  deleteAccountHandler,
   loginHandler,
   logoutHandler,
   revokeKeyHandler,
 } from "./dashboard";
 import { ICONS } from "./icons";
 import { privacyView, termsView } from "./legal";
-import { STATUS_INTERNAL_ERROR, STATUS_NOT_FOUND, STATUS_NOT_IMPLEMENTED, STATUS_OK } from "./status";
+import { STATUS_INTERNAL_ERROR, STATUS_NOT_FOUND, STATUS_OK } from "./status";
 import { HTML_HEADERS, htmlResponse, landingView, mcpUrl, messageView, STYLESHEET } from "./views";
 
 const CSS_CACHE_CONTROL = "public, max-age=300";
@@ -17,8 +19,6 @@ const CSS_CONTENT_TYPE = "text/css; charset=utf-8";
 const ICON_CACHE_CONTROL = "public, max-age=86400";
 const REGEX_METACHARACTERS = /[.*+?^${}()|[\]\\]/g;
 const PNG_CONTENT_TYPE = "image/png";
-const SIGN_IN_UNAVAILABLE_TITLE = "Sign-in not available yet";
-const SIGN_IN_UNAVAILABLE_TEXT = "Sign-in for AI assistants is not available yet. Use an API key from the dashboard instead.";
 
 type RouteHandler = (request: Request, env: Env, params: string[]) => Response | Promise<Response>;
 type Route = { method: string; pattern: RegExp; handler: RouteHandler };
@@ -39,10 +39,6 @@ function landingResponse(request: Request, env: Env): Response {
   const origin = resolvePublicOrigin(request, env);
   if (origin === null) return internalErrorResponse();
   return htmlResponse(landingView(mcpUrl(origin)), STATUS_OK);
-}
-
-function signInUnavailableResponse(): Response {
-  return htmlResponse(messageView(SIGN_IN_UNAVAILABLE_TITLE, SIGN_IN_UNAVAILABLE_TEXT), STATUS_NOT_IMPLEMENTED);
 }
 
 function notFoundResponse(): Response {
@@ -74,10 +70,11 @@ const ROUTES: Route[] = [
     pattern: /^\/dashboard\/keys\/([^/]+)\/revoke$/,
     handler: (request, env, [keyId = ""]) => revokeKeyHandler(request, env, keyId),
   },
+  { method: "POST", pattern: /^\/dashboard\/account\/delete$/, handler: deleteAccountHandler },
   { method: "POST", pattern: /^\/dashboard\/logout$/, handler: logoutHandler },
-  { method: "GET", pattern: /^\/authorize$/, handler: signInUnavailableResponse },
-  { method: "POST", pattern: /^\/authorize$/, handler: signInUnavailableResponse },
-  { method: "GET", pattern: /^\/callback\/google$/, handler: signInUnavailableResponse },
+  { method: "GET", pattern: /^\/authorize$/, handler: authorizeHandler },
+  { method: "POST", pattern: /^\/authorize$/, handler: authorizeDecisionHandler },
+  { method: "GET", pattern: /^\/callback\/google$/, handler: googleCallbackHandler },
 ];
 
 export const defaultHandler: ExportedHandler<Env> = {

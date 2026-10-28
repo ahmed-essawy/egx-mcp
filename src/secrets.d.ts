@@ -3,8 +3,12 @@ interface GoogleSecrets {
   SESSION_SECRET: string;
 }
 
-declare namespace Cloudflare {
-  interface Env extends GoogleSecrets {}
+interface OAuthBinding {
+  OAUTH_PROVIDER: import("@cloudflare/workers-oauth-provider").OAuthHelpers;
 }
 
-interface Env extends GoogleSecrets {}
+declare namespace Cloudflare {
+  interface Env extends GoogleSecrets, OAuthBinding {}
+}
+
+interface Env extends GoogleSecrets, OAuthBinding {}

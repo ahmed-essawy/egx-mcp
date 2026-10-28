@@ -5,7 +5,7 @@ import { defaultHandler } from "../../src/http/routes";
 import { ICON_LINKS, SITE_HEADER } from "../helpers/html";
 
 const ORIGIN = "https://egx.example.com";
-const NOT_IMPLEMENTED = 501;
+const SERVER_ERROR = 500;
 const NOT_FOUND = 404;
 const PNG_SIGNATURE = [137, 80, 78, 71, 13, 10, 26, 10];
 const ICON_CACHE_CONTROL = "public, max-age=86400";
@@ -108,13 +108,30 @@ describe("defaultHandler", () => {
   });
 
   it.each([
-    ["GET", "/authorize"],
-    ["POST", "/authorize"],
-    ["GET", "/callback/google"],
-  ])("answers %s %s with 501", async (method, path) => {
-    const response = await call(path, method);
-    expect(response.status).toBe(NOT_IMPLEMENTED);
-    expect(await response.text()).toContain("Sign-in not available yet");
+    ["GET", "/authorize", "parseAuthRequest"],
+    ["POST", "/authorize", "denyConsent"],
+    ["GET", "/callback/google", "finishUpstream"],
+  ])("routes %s %s to the OAuth provider helpers", async (method, path, helper) => {
+    const calls: string[] = [];
+    const provider = new Proxy(
+      {},
+      {
+        get: (_target, name) => async () => {
+          calls.push(String(name));
+          throw new Error("stop");
+        },
+      },
+    );
+    const bindings = { ...env, PUBLIC_ORIGIN: ORIGIN, OAUTH_PROVIDER: provider } as unknown as Env;
+    const request = new Request(`${ORIGIN}${path}`, {
+      method,
+      body: method === "POST" ? new URLSearchParams({ handle: "h", decision: "deny" }) : undefined,
+    });
+
+    const response = await defaultHandler.fetch!(request as never, bindings, {} as ExecutionContext);
+
+    expect(calls).toEqual([helper]);
+    expect(response.status).toBe(SERVER_ERROR);
   });
 
   it.each([

@@ -74,3 +74,7 @@ A user reading the README finds the live MCP address, the home page and links to
 ## Assumptions
 
 Owner answers to the planner questions (Q1 to Q4 in plan.md) use the recommended defaults until the owner says otherwise; each is a one-constant or one-sentence change.
+
+## Amendment 2 (2026-10-28): account deletion button and OAuth records
+
+FR-L03 section 9 now describes the dashboard "Delete account" button (T110) instead of deletion by email, with email kept as a fallback, and the "How long we keep data" section names the OAuth grant and token records kept in Cloudflare KV, the 24 hour access token lifetime and the revocation and removal of the grant and its tokens on account deletion (T130).

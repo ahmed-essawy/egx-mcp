@@ -4,15 +4,15 @@ import { checkPost, clearSessionCookie, createSessionCookie, readCookie, readSes
 import { loadConfig, parseOrigin, type Config } from "../config";
 import { toBase64Url } from "../domain/crypto";
 import { nowSeconds, utcDay } from "../domain/calendar";
-import { CAPACITY_MESSAGE, checkPersonalWrite } from "../limits/usage";
-import { addPersonalRows, readGlobal, readToolUsage } from "../store/d1/usage";
+import { readToolUsage } from "../store/d1/usage";
 import {
   MAX_ACTIVE_KEYS,
+  accountRowsUpperBound,
   createApiKey,
+  deleteAccount,
   getUser,
   listApiKeys,
   revokeApiKey,
-  upsertUserByGoogleSub,
   type User,
 } from "../store/d1/users";
 import {
@@ -25,9 +25,10 @@ import {
   STATUS_NOT_FOUND,
   STATUS_OK,
   STATUS_SEE_OTHER,
-  STATUS_SERVICE_UNAVAILABLE,
 } from "./status";
-import { DASHBOARD_PATH, KEY_NAME_MAX_LENGTH, dashboardView, htmlResponse, messageView, withCookies } from "./views";
+import { capacityResponse, messageResponse, redirect } from "./responses";
+import { accountDeletedResponse, hasCapacity, recordPersonalRows, signInGoogleUser } from "./sign-in";
+import { DASHBOARD_PATH, KEY_NAME_MAX_LENGTH, dashboardView, htmlResponse } from "./views";
 
 const LOGIN_COOKIE_NAME = "__Host-egx_login";
 const LOGIN_COOKIE_SECONDS = 600;
@@ -37,29 +38,19 @@ const STATE_BYTES = 32;
 const CALLBACK_PATH = "/dashboard/callback";
 const LANDING_PATH = "/";
 const LOGIN_PATH = "/dashboard/login";
-const NEW_USER_WORST_CASE_ROWS = 4;
 const KEY_CREATE_WORST_CASE_ROWS = 5;
 const KEY_REVOKE_WORST_CASE_ROWS = 3;
 const KEY_LIMIT_MESSAGE = `You already have ${MAX_ACTIVE_KEYS} active keys. Revoke one to create another.`;
 const KEY_NAME_MESSAGE = `Enter a key name of 1 to ${KEY_NAME_MAX_LENGTH} characters.`;
-const ACCOUNT_DELETED_MESSAGE = "This account has been deleted and cannot sign in.";
+const CONFIRM_MESSAGE = "Type your email address exactly to confirm deleting your account.";
+const ACCOUNT_DELETED_TITLE = "Account deleted";
+const ACCOUNT_REMOVED_MESSAGE =
+  "Your account, API keys, holdings, price levels and usage records were deleted, and your assistant connections were revoked.";
 const SIGN_IN_FAILED_MESSAGE = "Sign-in could not be completed. Please try again.";
 
 type Viewer = { user: User; csrf: string; now: number };
 type PostContext = Viewer & { cfg: Config };
 type Configured = { cfg: Config; origin: string };
-
-function messageResponse(title: string, text: string, status: number, cookies: string[] = []): Response {
-  return htmlResponse(messageView(title, text), status, cookies);
-}
-
-function redirect(location: string, status: number, cookies: string[] = []): Response {
-  return new Response(null, { status, headers: withCookies(new Headers({ location }), cookies) });
-}
-
-function capacityResponse(cookies: string[] = []): Response {
-  return messageResponse("Service at capacity", CAPACITY_MESSAGE, STATUS_SERVICE_UNAVAILABLE, cookies);
-}
 
 function signedOutResponse(status: number): Response {
   return redirect(LOGIN_PATH, status, [clearSessionCookie()]);
@@ -84,14 +75,6 @@ function clearLoginCookie(): string {
 
 function signInFailedResponse(status: number): Response {
   return messageResponse("Sign-in failed", SIGN_IN_FAILED_MESSAGE, status, [clearLoginCookie()]);
-}
-
-async function hasCapacity(env: Env, cfg: Config, now: number, worstCaseRows: number): Promise<boolean> {
-  return checkPersonalWrite(await readGlobal(env.DB, utcDay(now)), cfg, worstCaseRows);
-}
-
-async function recordPersonalRows(env: Env, now: number, rowsWritten: number): Promise<void> {
-  if (rowsWritten > 0) await addPersonalRows(env.DB, utcDay(now), rowsWritten);
 }
 
 async function findActiveUser(env: Env, userId: string): Promise<User | null> {
@@ -159,15 +142,10 @@ export async function callbackHandler(request: Request, env: Env): Promise<Respo
   }).catch(() => null);
   if (identity === null) return signInFailedResponse(STATUS_BAD_GATEWAY);
   const now = nowSeconds();
-  if (!(await hasCapacity(env, cfg, now, NEW_USER_WORST_CASE_ROWS))) {
-    return capacityResponse([clearLoginCookie()]);
-  }
-  const { id, deletedAt, rowsWritten } = await upsertUserByGoogleSub(env.DB, identity, now);
-  await recordPersonalRows(env, now, rowsWritten);
-  if (deletedAt !== null) {
-    return messageResponse("Account deleted", ACCOUNT_DELETED_MESSAGE, STATUS_FORBIDDEN, [clearLoginCookie()]);
-  }
-  return redirect(DASHBOARD_PATH, STATUS_FOUND, [await createSessionCookie(env, id, now), clearLoginCookie()]);
+  const signIn = await signInGoogleUser(env, cfg, identity, now);
+  if (signIn.kind === "capacity") return capacityResponse([clearLoginCookie()]);
+  if (signIn.kind === "deleted") return accountDeletedResponse([clearLoginCookie()]);
+  return redirect(DASHBOARD_PATH, STATUS_FOUND, [await createSessionCookie(env, signIn.id, now), clearLoginCookie()]);
 }
 
 export async function dashboardHandler(request: Request, env: Env): Promise<Response> {
@@ -213,6 +191,29 @@ export async function revokeKeyHandler(request: Request, env: Env, keyId: string
     return messageResponse("Key not found", "No active key with that id belongs to your account.", STATUS_NOT_FOUND);
   }
   return redirect(DASHBOARD_PATH, STATUS_SEE_OTHER);
+}
+
+async function revokeOAuthGrants(env: Env, userId: string): Promise<void> {
+  let cursor: string | undefined;
+  do {
+    const page = await env.OAUTH_PROVIDER.listUserGrants(userId, { cursor });
+    for (const grant of page.items) await env.OAUTH_PROVIDER.revokeGrant(grant.id, userId);
+    cursor = page.cursor;
+  } while (cursor !== undefined);
+}
+
+export async function deleteAccountHandler(request: Request, env: Env): Promise<Response> {
+  const context = await authorizePost(request, env);
+  if (context instanceof Response) return context;
+  const { user, cfg, now } = context;
+  const confirm = String((await request.formData()).get("confirm") ?? "").trim();
+  if (confirm !== user.email) return renderDashboard(env, context, STATUS_BAD_REQUEST, { error: CONFIRM_MESSAGE });
+  const worstCaseRows = await accountRowsUpperBound(env.DB, user.id);
+  if (!(await hasCapacity(env, cfg, now, worstCaseRows))) return capacityResponse();
+  await revokeOAuthGrants(env, user.id);
+  const { rowsWritten } = await deleteAccount(env.DB, user.id);
+  await recordPersonalRows(env, now, rowsWritten);
+  return messageResponse(ACCOUNT_DELETED_TITLE, ACCOUNT_REMOVED_MESSAGE, STATUS_OK, [clearSessionCookie()]);
 }
 
 export async function logoutHandler(request: Request, env: Env): Promise<Response> {

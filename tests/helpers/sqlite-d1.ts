@@ -28,6 +28,9 @@ export function createSqliteD1(): { db: D1Database; sqlite: DatabaseSync } {
             async all() {
               return runAll(statement);
             },
+            async first() {
+              return runAll(statement).results[0] ?? null;
+            },
           };
         },
       };

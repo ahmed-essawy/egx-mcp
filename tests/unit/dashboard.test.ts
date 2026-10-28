@@ -31,14 +31,26 @@ const KEY_REVOKE_WORST_CASE_ROWS = 3;
 const KEY_NAME_MAX_LENGTH = 40;
 const KEY_LIMIT_MESSAGE = "You already have 3 active keys. Revoke one to create another.";
 const CAPACITY_MESSAGE = "The free service is at capacity until 00:00 UTC.";
+const ACCOUNT_BOUND_ROWS = 12;
+const DELETE_PATH = "/dashboard/account/delete";
+const CONFIRM_MESSAGE = "Type your email address exactly to confirm deleting your account.";
 
 type Row = Record<string, unknown> | null;
 
-type FakeDbOptions = { upsertDeletedAt?: number | null; changes?: number; run?: Mock<(sql: string) => void> };
+type FakeDbOptions = {
+  upsertDeletedAt?: number | null;
+  changes?: number;
+  run?: Mock<(sql: string) => void>;
+  batch?: Mock<(count: number) => void>;
+};
 
 function fakeDb(rowFor: (sql: string) => Row, options: FakeDbOptions = {}): D1Database {
-  const { upsertDeletedAt = null, changes = 1, run = vi.fn<(sql: string) => void>() } = options;
+  const { upsertDeletedAt = null, changes = 1, run = vi.fn<(sql: string) => void>(), batch = vi.fn<(count: number) => void>() } = options;
   return {
+    batch: async (statements: unknown[]) => {
+      batch(statements.length);
+      return statements.map(() => ({ meta: { rows_written: 1 } }));
+    },
     prepare: (sql: string) => ({
       bind: () => ({
         first: async () => rowFor(sql),
@@ -53,6 +65,19 @@ function fakeDb(rowFor: (sql: string) => Row, options: FakeDbOptions = {}): D1Da
       }),
     }),
   } as unknown as D1Database;
+}
+
+function accountRows(personalRows: number): (sql: string) => Row {
+  return (sql) => {
+    if (sql.includes("AS bound")) return { bound: ACCOUNT_BOUND_ROWS };
+    return sql.includes("FROM users") ? USER_ROW : { personal_rows: personalRows };
+  };
+}
+
+function fakeOauth(pages: { items: { id: string }[]; cursor?: string }[]) {
+  const listUserGrants = vi.fn(async (_userId: string, options?: { cursor?: string }) => pages[options?.cursor === undefined ? 0 : 1]!);
+  const revokeGrant = vi.fn(async (_grantId: string, _userId: string) => undefined);
+  return { listUserGrants, revokeGrant };
 }
 
 function userAndUsage(personalRows: number): (sql: string) => Row {
@@ -213,6 +238,52 @@ describe("dashboard routes without a database", () => {
       expect(response.status).toBe(503);
       expect(await response.text()).toContain(CAPACITY_MESSAGE);
       expect(run).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("account deletion", () => {
+    it("answers 400 and deletes and revokes nothing when the confirm field is not the email", async () => {
+      const batch = vi.fn<(count: number) => void>();
+      const oauth = fakeOauth([{ items: [{ id: "grant-1" }] }]);
+      const env = envWith({ DB: fakeDb(accountRows(0), { batch }), OAUTH_PROVIDER: oauth });
+
+      const response = await postKeyForm(DELETE_PATH, env, { confirm: "other@example.com" });
+
+      expect(response.status).toBe(400);
+      expect(await response.text()).toContain(CONFIRM_MESSAGE);
+      expect(batch).not.toHaveBeenCalled();
+      expect(oauth.listUserGrants).not.toHaveBeenCalled();
+    });
+
+    it("answers 503 with the capacity message and deletes and revokes nothing at capacity", async () => {
+      const batch = vi.fn<(count: number) => void>();
+      const oauth = fakeOauth([{ items: [{ id: "grant-1" }] }]);
+      const env = envWith({ DB: fakeDb(accountRows(PERSONAL_DAILY_ROWS - ACCOUNT_BOUND_ROWS + 1), { batch }), OAUTH_PROVIDER: oauth });
+
+      const response = await postKeyForm(DELETE_PATH, env, { confirm: USER_ROW.email });
+
+      expect(response.status).toBe(503);
+      expect(await response.text()).toContain(CAPACITY_MESSAGE);
+      expect(batch).not.toHaveBeenCalled();
+      expect(oauth.listUserGrants).not.toHaveBeenCalled();
+    });
+
+    it("revokes every grant across pages, deletes the account and clears the session", async () => {
+      const batch = vi.fn<(count: number) => void>();
+      const oauth = fakeOauth([{ items: [{ id: "grant-1" }, { id: "grant-2" }], cursor: "next" }, { items: [{ id: "grant-3" }] }]);
+      const env = envWith({ DB: fakeDb(accountRows(0), { batch }), OAUTH_PROVIDER: oauth });
+
+      const response = await postKeyForm(DELETE_PATH, env, { confirm: ` ${USER_ROW.email} ` });
+
+      expect(response.status).toBe(200);
+      expect(await response.text()).toContain("Account deleted");
+      expect(response.headers.get("set-cookie")).toContain("Max-Age=0");
+      expect(batch).toHaveBeenCalledOnce();
+      expect(oauth.revokeGrant.mock.calls).toEqual([
+        ["grant-1", USER_ID],
+        ["grant-2", USER_ID],
+        ["grant-3", USER_ID],
+      ]);
     });
   });
 

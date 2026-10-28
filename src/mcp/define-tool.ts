@@ -11,6 +11,8 @@ const INTERNAL_ERROR_MESSAGE = "Temporarily unavailable.";
 const ISSUE_SEPARATOR = "; ";
 const PATH_SEPARATOR = ".";
 const PATH_PREFIX_SEPARATOR = ": ";
+const WRITE_SCOPE = "mcp:write";
+const WRITE_SCOPE_MESSAGE = "This tool needs write access, which this connection was not granted.";
 const INVALID_INPUT = Symbol("invalid_input");
 
 type Issue = { message: string; path?: ReadonlyArray<PropertyKey | { key: PropertyKey }> };
@@ -66,6 +68,7 @@ async function serveCall<I extends StandardSchemaWithJSON, O extends StandardSch
   env: Env,
   auth: AuthProps,
 ): Promise<CallToolResult> {
+  if (!tool.readOnly && !auth.scopes.includes(WRITE_SCOPE)) return fail("forbidden", WRITE_SCOPE_MESSAGE);
   const cfg = loadConfig(env);
   const rows = new RowsCounter();
   const now = nowSeconds();

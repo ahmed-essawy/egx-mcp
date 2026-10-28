@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   consentView,
+  type ConsentInput,
   dashboardView,
   escapeHtml,
   HOME_PATH,
@@ -19,6 +20,7 @@ const SCRIPT_PAYLOAD = "<script>alert(1)</script>";
 const ESCAPED_SCRIPT_OPEN = "&lt;script&gt;";
 const SCRIPT_OPEN_TAG = "<script";
 const CSRF = "csrf-token-value";
+const HANDLE = "consent-handle-value";
 const SAFE_EMAIL = "reader@example.com";
 const KEY_ID = "key-1";
 const KEY_PREFIX = "egx_abcd";
@@ -38,7 +40,7 @@ const HOSTILE_URL = 'https://x.test/"><script>';
 const VALUE_LINE = "Ask your AI assistant about Egyptian Exchange stocks and indices. Data is delayed.";
 const BEARER_HEADER = "Authorization: Bearer &lt;your key&gt;";
 const CONNECT_NOTE =
-  "Create your key after signing in. Works in Claude (custom connector, no sign-in, add the header), Claude Code and Cursor.";
+  "Claude, ChatGPT and Cursor connect with Google sign-in or with an API key header. Create your key after signing in.";
 const NOTICE =
   "Data is delayed, unofficial and for information only, not financial advice. Sources: EGX website, TradingView, Mubasher Info, iSagha.";
 const GITHUB_LINK = '<a href="https://github.com/ahmed-essawy/egx-mcp">GitHub</a>';
@@ -176,6 +178,17 @@ describe("dashboardView", () => {
     expect(html).not.toContain("/revoke");
   });
 
+  it("offers a labeled Delete account form that posts the confirm field with the csrf token", () => {
+    const html = dashboardView(dashboardInput());
+
+    expect(html).toContain('<h2 id="delete-title">Delete account</h2>');
+    expect(html).toContain('<form method="post" action="/dashboard/account/delete">');
+    expect(html).toMatch(/<input id="delete-confirm" name="confirm"[^>]*required>/);
+    expect(html).toContain('for="delete-confirm"');
+    expect(html).toContain('>Delete account</button>');
+    expect(html).toContain(`Type your email address, ${SAFE_EMAIL}, to confirm.`);
+  });
+
   it("carries the csrf token in its forms", () => {
     const html = dashboardView(dashboardInput());
 
@@ -183,16 +196,66 @@ describe("dashboardView", () => {
   });
 });
 
+const CONSENT_BASE: ConsentInput = {
+  clientName: "Client",
+  redirectHost: "client.example",
+  redirectIsLoopback: false,
+  scopes: ["read"],
+  handle: HANDLE,
+};
+
 describe("consentView", () => {
-  it("escapes the client name and scopes", () => {
-    const html = consentView({ clientName: SCRIPT_PAYLOAD, scopes: [SCRIPT_PAYLOAD], csrf: CSRF });
+  it("escapes the client name, scopes, redirect host and client domain", () => {
+    const html = consentView({
+      ...CONSENT_BASE,
+      clientName: SCRIPT_PAYLOAD,
+      clientDomain: SCRIPT_PAYLOAD,
+      redirectHost: SCRIPT_PAYLOAD,
+      scopes: [SCRIPT_PAYLOAD],
+    });
 
     expect(html).toContain(ESCAPED_SCRIPT_OPEN);
     expect(html).not.toContain(SCRIPT_PAYLOAD);
   });
 
+  it("shows the redirect host the access will be sent to", () => {
+    const html = consentView(CONSENT_BASE);
+
+    expect(html).toContain("Access will be sent to <strong>client.example</strong>.");
+  });
+
+  it("warns only when the redirect goes to a local app", () => {
+    const local = consentView({ ...CONSENT_BASE, redirectHost: "localhost", redirectIsLoopback: true });
+
+    expect(local).toContain("Access will be sent to an app on your own computer");
+    expect(consentView(CONSENT_BASE)).not.toContain("on your own computer");
+  });
+
+  it("names the verified domain of a published client", () => {
+    const html = consentView({ ...CONSENT_BASE, clientDomain: "app.example" });
+
+    expect(html).toContain("This app is published by app.example.");
+    expect(html).not.toContain("its name is not verified");
+  });
+
+  it("says a self-registered client is not verified", () => {
+    const html = consentView(CONSENT_BASE);
+
+    expect(html).toContain("This app registered itself; its name is not verified.");
+    expect(html).not.toContain("is published by");
+  });
+
+  it("posts the handle with labeled Approve and Deny buttons and the delay statement", () => {
+    const html = consentView(CONSENT_BASE);
+
+    expect(html).toContain(`name="handle" value="${HANDLE}"`);
+    expect(html).toContain('name="decision" value="approve">Approve</button>');
+    expect(html).toContain('name="decision" value="deny">Deny</button>');
+    expect(html).toContain("Data is delayed, unofficial and informational only");
+  });
+
   it("shows the agreement notice with both policy links", () => {
-    const html = consentView({ clientName: "Client", scopes: ["read"], csrf: CSRF });
+    const html = consentView(CONSENT_BASE);
     const notice = AGREEMENT_PARAGRAPH_PATTERN.exec(html)?.[0] ?? "";
 
     expect(notice).toContain(AUTHORIZE_AGREEMENT);

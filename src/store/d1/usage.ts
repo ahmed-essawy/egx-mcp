@@ -114,6 +114,19 @@ export function addOauthKvWrites(db: D1Database, day: string, n: number): Promis
   return addGlobalCounter(db, "oauth_kv_writes", day, n);
 }
 
+export async function chargeOauthKvWrites(db: D1Database, day: string, n: number, cap: number): Promise<boolean> {
+  const { results } = await db
+    .prepare(
+      `INSERT INTO usage_global (day, oauth_kv_writes) SELECT ?1, ?2 WHERE ?2 <= ?3
+       ON CONFLICT (day) DO UPDATE SET oauth_kv_writes = oauth_kv_writes + excluded.oauth_kv_writes
+         WHERE oauth_kv_writes + excluded.oauth_kv_writes <= ?3
+       RETURNING oauth_kv_writes`,
+    )
+    .bind(day, n, cap)
+    .all<{ oauth_kv_writes: number }>();
+  return results.length > 0;
+}
+
 export function addBackfillRows(db: D1Database, day: string, n: number): Promise<WriteResult> {
   return addGlobalCounter(db, "backfill_rows", day, n);
 }

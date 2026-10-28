@@ -70,3 +70,7 @@ FR-H02 to FR-H07 are replaced by the following. FR-H01 and FR-H08 to FR-H09 stay
 - **FR-H05 Removed**: the example prompts, the three step guide, the tool list, the data sources section, the "Read the docs" button and the claim that Claude custom connectors cannot send a header.
 - **FR-H06 Footer**: the shared footer on every page: Home, Privacy policy, Terms of use and GitHub. The GitHub link is the only external link on the home page.
 - **FR-H07**: reserved.
+
+## Amendment 2 (2026-10-28): connect note after OAuth sign-in
+
+FR-H03 line is now: "Claude, ChatGPT and Cursor connect with Google sign-in or with an API key header. Create your key after signing in." The Independent Test and the client wording assumption follow this line (T130).

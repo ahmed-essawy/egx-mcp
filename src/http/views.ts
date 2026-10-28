@@ -22,7 +22,9 @@ const PRODUCT_NAME = "EGX MCP";
 const GITHUB_URL = "https://github.com/ahmed-essawy/egx-mcp";
 const VALUE_LINE = "Ask your AI assistant about Egyptian Exchange stocks and indices. Data is delayed.";
 const CONNECT_NOTE =
-  "Create your key after signing in. Works in Claude (custom connector, no sign-in, add the header), Claude Code and Cursor.";
+  "Claude, ChatGPT and Cursor connect with Google sign-in or with an API key header. Create your key after signing in.";
+const UNVERIFIED_CLIENT_NOTICE = "This app registered itself; its name is not verified.";
+const LOOPBACK_WARNING = "Access will be sent to an app on your own computer. Any program on this computer could receive it.";
 const NOTICE =
   "Data is delayed, unofficial and for information only, not financial advice. Sources: EGX website, TradingView, Mubasher Info, iSagha.";
 export const DATA_SOURCES = [
@@ -83,7 +85,14 @@ export const HTML_HEADERS: Record<string, string> = {
   "cache-control": "no-store",
 };
 
-export type ConsentInput = { clientName: string; scopes: string[]; csrf: string };
+export type ConsentInput = {
+  clientName: string;
+  clientDomain?: string;
+  redirectHost: string;
+  redirectIsLoopback: boolean;
+  scopes: string[];
+  handle: string;
+};
 
 export type DashboardInput = {
   email: string;
@@ -146,12 +155,13 @@ export function consentView(input: ConsentInput): string {
     "Authorize access",
     `<h1>Authorize access</h1>
 <p>${escapeHtml(input.clientName)} requests access to your EGX MCP account with these scopes.</p>
+${destinationNotices(input)}
 <ul>
 ${scopes}
 </ul>
 <p>${escapeHtml(DISCLAIMER)}</p>
 ${agreementNotice("authorizing")}
-${csrfField(input.csrf)}`,
+${consentForm(input.handle)}`,
   );
 }
 
@@ -164,6 +174,7 @@ export function dashboardView(input: DashboardInput): string {
     keysSection(input.keys, input.csrf),
     createKeyForm(input.csrf),
     usageSection(input.usage),
+    deleteAccountForm(input.email, input.csrf),
     logoutForm(input.csrf),
   ];
   return page("Dashboard", body.filter((section) => section !== "").join("\n"));
@@ -213,6 +224,26 @@ function agreementNotice(action: string): string {
 
 function csrfField(csrf: string): string {
   return `<input type="hidden" name="${CSRF_FIELD}" value="${escapeHtml(csrf)}">`;
+}
+
+function destinationNotices(input: ConsentInput): string {
+  const origin = input.clientDomain === undefined
+    ? UNVERIFIED_CLIENT_NOTICE
+    : `This app is published by ${input.clientDomain}.`;
+  const notices = [
+    `<p>${escapeHtml(origin)}</p>`,
+    `<p>Access will be sent to <strong>${escapeHtml(input.redirectHost)}</strong>.</p>`,
+  ];
+  if (input.redirectIsLoopback) notices.push(`<p class="error" role="alert">${escapeHtml(LOOPBACK_WARNING)}</p>`);
+  return notices.join("\n");
+}
+
+function consentForm(handle: string): string {
+  return `<form method="post" action="/authorize">
+<input type="hidden" name="handle" value="${escapeHtml(handle)}">
+<button type="submit" name="decision" value="approve">Approve</button>
+<button type="submit" name="decision" value="deny">Deny</button>
+</form>`;
 }
 
 function errorSection(error: string | undefined): string {
@@ -279,6 +310,19 @@ function usageSection(usage: DashboardInput["usage"]): string {
 ${rows}
 </tbody>
 </table>
+</section>`;
+}
+
+function deleteAccountForm(email: string, csrf: string): string {
+  return `<section aria-labelledby="delete-title">
+<h2 id="delete-title">Delete account</h2>
+<p>This permanently deletes your account, API keys, holdings, price levels and usage records, and revokes your assistant connections. Type your email address, ${escapeHtml(email)}, to confirm.</p>
+<form method="post" action="/dashboard/account/delete">
+${csrfField(csrf)}
+<label for="delete-confirm">Confirm your email</label>
+<input id="delete-confirm" name="confirm" type="email" autocomplete="off" required>
+<button type="submit">Delete account</button>
+</form>
 </section>`;
 }
 
