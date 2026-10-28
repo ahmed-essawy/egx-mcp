@@ -15,7 +15,7 @@ import { asString, isPresent } from "./values";
 const PROVIDER_ID = "tradingview";
 const SCAN_URL = "https://scanner.tradingview.com/egypt/scan";
 const INDEX_SCAN_URL = "https://scanner.tradingview.com/global/scan";
-const INDEX_COLUMNS = ["name", "close", "change", "update_time"];
+const INDEX_COLUMNS = ["name", "close", "change", "last_bar_update_time"];
 const SCAN_RANGE = [0, 400];
 const STOCK_TYPE = "stock";
 const LISTING_MARKET = "main";
