@@ -4,7 +4,8 @@ import type { Directory, DirectoryFund, DirectorySymbol } from "../store/kv";
 export const MAX_SYMBOL_INPUT_LENGTH = 80;
 export const MAX_AMBIGUOUS_CANDIDATES = 10;
 export const MAX_NOT_FOUND_SUGGESTIONS = 5;
-const MIN_SHARED_PREFIX = 2;
+const MIN_FUZZY_PREFIX = 3;
+const FUZZY_PREFIX_SHARE = 0.5;
 
 export type Resolution<E> =
   | { ok: true; entry: E }
@@ -18,11 +19,12 @@ export type SearchHit =
 
 type Predicate<E> = (entry: E, query: string) => boolean;
 
-type Rank = 0 | 1 | 2;
+type Rank = 0 | 1 | 2 | 3;
 
 const RANK_EXACT = 0;
 const RANK_PREFIX = 1;
 const RANK_SUBSTRING = 2;
+const RANK_FUZZY = 3;
 
 function isinOf(entry: DirectorySymbol): string {
   return entry[0];
@@ -104,6 +106,15 @@ function compareKeys(a: string, b: string): number {
   return a > b ? 1 : 0;
 }
 
+function fuzzyRank(fields: string[], query: string): Rank | null {
+  const required = Math.max(MIN_FUZZY_PREFIX, Math.ceil(query.length * FUZZY_PREFIX_SHARE));
+  return longestSharedPrefix(fields, query) >= required ? RANK_FUZZY : null;
+}
+
+function suggestionRank(fields: string[], query: string): Rank | null {
+  return bestRank(fields, query) ?? fuzzyRank(fields, query);
+}
+
 function suggest<E>(
   entries: E[],
   query: string,
@@ -111,9 +122,11 @@ function suggest<E>(
   sortKeyOf: (entry: E) => string,
 ): E[] {
   return entries
-    .map((entry) => ({ entry, shared: longestSharedPrefix(keysOf(entry), query) }))
-    .filter(({ shared }) => shared >= MIN_SHARED_PREFIX)
-    .sort((a, b) => b.shared - a.shared || compareKeys(sortKeyOf(a.entry), sortKeyOf(b.entry)))
+    .flatMap((entry) => {
+      const rank = suggestionRank(keysOf(entry), query);
+      return rank === null ? [] : [{ entry, rank }];
+    })
+    .sort((a, b) => a.rank - b.rank || compareKeys(sortKeyOf(a.entry), sortKeyOf(b.entry)))
     .slice(0, MAX_NOT_FOUND_SUGGESTIONS)
     .map(({ entry }) => entry);
 }

@@ -128,7 +128,7 @@ describe("resolveSymbol", () => {
     expect(result).toEqual({ ok: false, code: "ambiguous", candidates: bankGroup.slice(0, 2) });
   });
 
-  it("returns not_found with up to 5 suggestions ordered by shared prefix then ticker", () => {
+  it("returns not_found with up to 5 suggestions ordered by ticker", () => {
     const result = resolveSymbol(dir, "bnk99");
     expect(result.ok).toBe(false);
     if (result.ok) throw new Error("expected a failure");
@@ -145,6 +145,21 @@ describe("resolveSymbol", () => {
 
   it("suggests the entry sharing the longest prefix", () => {
     expect(resolveSymbol(dir, "COMX")).toEqual({ ok: false, code: "not_found", candidates: [comi] });
+  });
+
+  it("returns no suggestions for an unrelated code that only shares one or two letters", () => {
+    expect(resolveSymbol(dir, "NOPE123")).toEqual({ ok: false, code: "not_found", candidates: [] });
+  });
+
+  it("suggests a ticker that starts with the input before one that merely contains it", () => {
+    const prefixed = symbol("EGS00000C900", "OMIX", null, null);
+    const result = resolveSymbol(directory([comi, prefixed]), "omi");
+
+    expect(result).toEqual({ ok: false, code: "not_found", candidates: [prefixed, comi] });
+  });
+
+  it("suggests a ticker that contains the input", () => {
+    expect(resolveSymbol(dir, "OMI")).toEqual({ ok: false, code: "not_found", candidates: [comi] });
   });
 
   it("returns not_found without suggestions when nothing shares a prefix", () => {
@@ -185,11 +200,11 @@ describe("resolveFund", () => {
     expect(resolveFund(dir, "Misr Capital")).toEqual({ ok: true, entry: gamma });
   });
 
-  it("returns not_found with suggestions by shared prefix", () => {
+  it("returns not_found with only the fund sharing most of the name", () => {
     expect(resolveFund(dir, "صندوق الاهلي الثالث")).toEqual({
       ok: false,
       code: "not_found",
-      candidates: [alpha, beta, gamma],
+      candidates: [alpha],
     });
   });
 });

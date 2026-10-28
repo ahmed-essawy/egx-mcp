@@ -2,7 +2,7 @@
 
 Transport: MCP Streamable HTTP, stateless, at `POST /mcp` (see [http-endpoints.md](http-endpoints.md)). Auth: OAuth access token or API key as `Authorization: Bearer`. Every tool declares `inputSchema` and `outputSchema` (zod 4) and returns `structuredContent` plus one `text` content item with the same JSON.
 
-Symbol inputs (`symbol`, `symbols[]`) accept a ticker, ISIN, Arabic or English name; resolution uses the directory and fails with `not_found` (with up to 5 suggestions) or `ambiguous` (with candidates).
+Symbol inputs (`symbol`, `symbols[]`) accept a ticker, ISIN, Arabic or English name; resolution uses the directory and fails with `not_found` (with up to 5 suggestions, possibly none: tickers and names that start with the input first, then ones that contain it, then ones that share at least 3 letters and half of the input from the start) or `ambiguous` (with candidates).
 
 ## Common envelope
 
