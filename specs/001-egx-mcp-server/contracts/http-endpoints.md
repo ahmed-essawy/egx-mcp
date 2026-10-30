@@ -25,7 +25,8 @@ Session: HMAC-SHA-256 signed cookie `__Host-egx_session` (`user id`, `exp` 12 h)
 | `GET /` | Public home page (spec 003, amendment 1): "EGX MCP", one sentence, a "Sign in" button (`/dashboard`) with "By signing in you agree to the Terms of use and acknowledge the Privacy policy" (both linked); a "Connect your assistant" block showing the MCP address `<origin>/mcp` (origin from `PUBLIC_ORIGIN`, or the request origin when it is empty; `500` when it is invalid) and `Authorization: Bearer <your key>`; one notice that data is delayed, unofficial and not advice, with the sources (the independence sentence is in the site header, spec 005). No D1 or KV read, no cookie. The only external link is the GitHub link in the footer |
 | `GET /privacy` | Public static privacy policy (spec 002, FR-L03). No session, no cookies, no D1 or KV read. Other methods `404` |
 | `GET /terms` | Public static terms of use (spec 002, FR-L04). No session, no cookies, no D1 or KV read. Other methods `404` |
-| `GET /favicon-32.png`, `GET /favicon.ico`, `GET /apple-touch-icon.png`, `GET /icon-192.png` | Public static PNG logo images (spec 005): 32, 32, 180 and 192 px, `Content-Type: image/png`, `Cache-Control: public, max-age=86400`, no cookie, no D1 or KV read. Other methods `404` |
+| `GET /favicon-32.png`, `/apple-touch-icon.png`, `/icon-192.png`, `/icon-512.png`, `/logo-96.png` | PNG 32, 180, 192, 512, 96 px, `image/png`, `public, max-age=86400`, no cookie, no D1 or KV read. Other methods 404 (spec 005, Amendment 1) |
+| `GET /favicon.ico` | ICO with 16, 32, 48 px, `image/x-icon`, same cache, no cookie, no D1 or KV read. Other methods 404 (spec 005, Amendment 1) |
 | `GET /dashboard/login` | Redirect to Google (state cookie, PKCE) |
 | `GET /dashboard/callback` | Verify Google ID token, upsert user, set session, redirect to `/dashboard` |
 | `GET /dashboard` | List keys: `prefix`, `name`, `createdAt`, `lastUsedAt`, `revokedAt`; today's usage per tool |
@@ -35,6 +36,8 @@ Session: HMAC-SHA-256 signed cookie `__Host-egx_session` (`user id`, `exp` 12 h)
 | `POST /dashboard/logout` | Clears the cookie |
 
 All HTML responses carry `Content-Security-Policy: default-src 'self'; frame-ancestors 'none'`, `X-Content-Type-Options: nosniff`, `Cache-Control: no-store` (the one-time plaintext key must not be cached; `/styles.css` is static and keeps `Cache-Control: public, max-age=300`), `Referrer-Policy: same-origin` (a stricter `no-referrer` would make browsers send `Origin: null` on form POSTs, and `checkPost` would refuse every dashboard POST). Pages meet WCAG 2.2 AA (labels, focus order, contrast). Every HTML page ends with a footer `<nav aria-label="Site">` linking `/`, `/privacy`, `/terms` and the GitHub repository; the consent page also carries the "By authorizing you agree ..." sentence with both links (spec 002).
+
+The MCP `initialize` result lists `serverInfo.icons`: the 32, 192 and 512 px PNGs on the public origin (spec 005, Amendment 1).
 
 ## Scheduled (cron, UTC)
 

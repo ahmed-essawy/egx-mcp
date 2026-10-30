@@ -68,7 +68,7 @@ export function putJson(stores: NodeStores, key: string, value: unknown): void {
 }
 
 async function request<T>(env: Env, method: string, params?: Record<string, unknown>): Promise<T> {
-  const server = createServer(env, NODE_AUTH);
+  const server = createServer(env, NODE_AUTH, []);
   const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
   const responses = new Map<number, RpcResponse>();
   clientTransport.onmessage = (message) => {

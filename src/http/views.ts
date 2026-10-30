@@ -12,7 +12,8 @@ const STYLESHEET_PATH = "/styles.css";
 export const FAVICON_PATH = "/favicon-32.png";
 export const ICON_PATH = "/icon-192.png";
 export const APPLE_TOUCH_ICON_PATH = "/apple-touch-icon.png";
-const LOGO_ALT = "EGX MCP home";
+export const LARGE_ICON_PATH = "/icon-512.png";
+export const LOGO_PATH = "/logo-96.png";
 const LOGO_SIZE = 48;
 const AFFILIATION = "Independent service, not affiliated with the Egyptian Exchange.";
 export const MCP_PATH = "/mcp";
@@ -54,6 +55,7 @@ header, main, footer { max-width: 38rem; margin: 0 auto; padding: 1.5rem 1rem; }
 footer { border-top: 1px solid var(--border); }
 footer nav { display: flex; flex-wrap: wrap; gap: 1rem; }
 header { display: flex; flex-wrap: wrap; align-items: center; gap: 0.75rem; padding-bottom: 0; }
+.brand { display: flex; align-items: center; gap: 0.5rem; color: var(--text); font-weight: 600; font-size: 1.125rem; text-decoration: none; }
 .brand img { display: block; }
 .affiliation { margin: 0; }
 a { color: var(--link); }
@@ -211,7 +213,7 @@ function iconLinks(): string {
 }
 
 function siteHeader(): string {
-  return `<header><a class="brand" href="${HOME_PATH}"><img src="${ICON_PATH}" alt="${LOGO_ALT}" width="${LOGO_SIZE}" height="${LOGO_SIZE}"></a><p class="affiliation">${escapeHtml(AFFILIATION)}</p></header>`;
+  return `<header><a class="brand" href="${HOME_PATH}"><img src="${LOGO_PATH}" alt="" width="${LOGO_SIZE}" height="${LOGO_SIZE}">${escapeHtml(PRODUCT_NAME)}</a><p class="affiliation">${escapeHtml(AFFILIATION)}</p></header>`;
 }
 
 function siteFooter(): string {

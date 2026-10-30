@@ -41,3 +41,52 @@
 ## Phase 3: Verify
 
 - [x] T005 Verify: `npm run typecheck` (PASS); Node-pool unit run (0 failures). `npm test` NOT RUN (forbidden). Grep the added lines of the diff: no U+2014, no U+2013, no `Co-Authored`, no comment line in `.ts` files (added lines matching `^\+\s*(//|/\*)`), no `http` URL added to `src/http`. `git status --short` shows only `src/http/views.ts`, `src/http/routes.ts`, `src/http/icons.ts`, `tests/unit/views.test.ts`, `tests/unit/routes.test.ts`, `tests/helpers/html.ts`, `specs/001-egx-mcp-server/contracts/http-endpoints.md`, `specs/003-home-page/spec.md`, `specs/005-logo-favicon/*`. Render check (reviewer, scratch only): render `landingView` and `privacyView` with `STYLESHEET` as in spec 003 T007, serving the three PNGs from the state folder icons beside the HTML, at 375, 1024 and 1440 px in light and dark: header on one row or cleanly wrapped, no horizontal scroll; else record NOT RENDERED.
+
+## Amendment 1 (2026-10-31): EGX MCP logo
+
+**Input**: spec.md and plan.md, Amendment 1. Repo: `D:/Work/EGX MCP` (the user's folder, branch `feat/new-logo`) for every task; one repo, so no `[P]`. Order is strict: each test task is written and seen failing before its code task. Commit split: single squash commit (profile `deliver: squash-local`).
+
+**Rules for this amendment (repeat in every implementer and reviewer prompt)**:
+- The Phase 1 to 3 hard rules above (Node-pool only, never `npm test`) are superseded by the current profile: verify with `npm run typecheck` and `npm test`. Baseline at b143e4b: typecheck PASS, `npm test` 68 files, 1452 tests, 0 failures. Any failure is new.
+- Never run `wrangler deploy`, any Cloudflare API call, or any write against the live Worker.
+- Touch only: `src/http/icons.ts`, `src/http/routes.ts`, `src/http/views.ts`, `src/mcp/server.ts`, `src/auth/oauth-options.ts`, `tests/unit/routes.test.ts`, `tests/unit/views.test.ts`, `tests/unit/icons.test.ts` (new), `tests/unit/server.test.ts`, `tests/contract/server-info.test.ts` (new), `tests/helpers/html.ts`, `tests/helpers/mcp.ts`, `tests/helpers/node-mcp.ts`, `specs/005-logo-favicon/*`, `specs/001-egx-mcp-server/contracts/http-endpoints.md`. `.mcp.json` is a run file included as is. Never touch `.claude/`, `CLAUDE.md`, or the user's uncommitted `specs/001-egx-mcp-server/research.md` and `tasks.md`.
+- No em or en dashes, no AI attribution, no comments in code, stage by explicit path, never stage an image file, never commit the assets folder.
+
+### Phase 4: New artwork on every icon route (US1)
+
+- [x] T006 [US1] Tests in `tests/unit/routes.test.ts`:
+  - Constants: `const ICO_CONTENT_TYPE = "image/x-icon";`, `const ICO_HEADER = [0, 0, 1, 0, 3, 0];`, `const ICO_SIZES = [16, 32, 48];`, `const ICO_ENTRY_SIZE = 16;`, `const ICO_DIRECTORY_OFFSET = 6;`, `const ICO_IMAGE_OFFSET_FIELD = 12;`, `const COLOR_TYPE_RGBA = 6;`, and `const ARTWORK_SHA256: [string, string][]` holding the six path and SHA-256 pairs from plan.md, Amendment 1 (in the plan's table order).
+  - Helper `async function sha256Hex(bytes: Uint8Array): Promise<string>` using `crypto.subtle.digest("SHA-256", bytes)` and lower-case hex.
+  - The PNG `it.each` table becomes `["/favicon-32.png", 32], ["/apple-touch-icon.png", 180], ["/icon-192.png", 192], ["/icon-512.png", 512], ["/logo-96.png", 96]` (the `/favicon.ico` row moves to its own test); assertions unchanged.
+  - `it.each(ARTWORK_SHA256)("serves the EGX MCP artwork at %s", ...)`: status 200 and `sha256Hex` of the body equals the pinned hash.
+  - "serves /favicon.ico as a 16, 32 and 48 px icon": status 200; `content-type` is `ICO_CONTENT_TYPE`; `cache-control` is `ICON_CACHE_CONTROL`; `x-content-type-options` is `nosniff`; `set-cookie` null; the first 6 bytes equal `ICO_HEADER`; for each index `i` of `ICO_SIZES`, the width byte at `ICO_DIRECTORY_OFFSET + i * ICO_ENTRY_SIZE` and the height byte right after it equal `ICO_SIZES[i]`, and the 8 bytes at the little-endian uint32 offset read from `ICO_DIRECTORY_OFFSET + i * ICO_ENTRY_SIZE + ICO_IMAGE_OFFSET_FIELD` equal `PNG_SIGNATURE`.
+  - "serves the header logo with an alpha channel for its rounded corners": `GET /logo-96.png` byte at `COLOR_TYPE_OFFSET` is `COLOR_TYPE_RGBA`. The apple touch icon test (colour type 2) stays.
+  - Add `["POST", "/icon-512.png"]` and `["POST", "/logo-96.png"]` to the 404 table.
+  Acceptance: the artwork, ICO, 512, 96 and logo alpha cases fail (old assets or 404); every other test passes.
+- [x] T007 [US1] Implement per plan.md, Amendment 1, Design: `LARGE_ICON_PATH` and `LOGO_PATH` in `src/http/views.ts` (only the constants in this task); rewrite `src/http/icons.ts` as designed except the MCP parts (`Icon` import, `MCP_ICON_SIZES`, `mcpIcons`, which T011 adds), pasting the six lines printed by the plan's `node -e` command in place of the `<generated>` lines; `src/http/routes.ts` changes (`IconAsset`, `iconResponse(icon)`, removed `PNG_CONTENT_TYPE`). Acceptance: T006 passes; typecheck clean; `npm test` 0 failures; `git status --short` shows no image file.
+
+### Phase 5: Header mark and name (US1)
+
+- [x] T008 [US1] Tests:
+  - `tests/helpers/html.ts`: `SITE_HEADER` becomes
+    `'<header><a class="brand" href="/"><img src="/logo-96.png" alt="" width="48" height="48">EGX MCP</a><p class="affiliation">Independent service, not affiliated with the Egyptian Exchange.</p></header>'`. `ICON_LINKS` and `AFFILIATION` unchanged.
+  - `tests/unit/views.test.ts`: rename "shows the linked logo with alt text and the affiliation in a header between the skip link and main" to "shows the linked mark and product name with the affiliation in a header between the skip link and main" (assertions unchanged, they use `SITE_HEADER`); in the `STYLESHEET` "styles the header row without external images" test also assert it contains `.brand { display: flex;` and `text-decoration: none;`. The existing "loads nothing external", "declares hex colors only in custom properties", "links the stylesheet and carries no inline styles" and "states the affiliation once" tests stay and must pass.
+  - The routes tests for `/`, `/privacy` and `/terms` and the `dashboardView` test already assert `SITE_HEADER`; no change.
+  Acceptance: the header and stylesheet assertions fail; nothing else fails.
+- [x] T009 [US1] Implement per plan.md, Amendment 1, Design in `src/http/views.ts`: remove `LOGO_ALT`, new `siteHeader()` body, the `.brand` rule before `.brand img`. Acceptance: T008 passes; typecheck clean; `npm test` 0 failures.
+
+### Phase 6: MCP server icons (US3)
+
+- [x] T010 [US3] Tests:
+  - `tests/unit/icons.test.ts` (new, Workers pool by default): `describe("mcpIcons")`, "builds absolute PNG icon URLs on the given origin": `mcpIcons("https://egx.example.com")` equals `[{ src: "https://egx.example.com/favicon-32.png", mimeType: "image/png", sizes: ["32x32"] }, { src: "https://egx.example.com/icon-192.png", mimeType: "image/png", sizes: ["192x192"] }, { src: "https://egx.example.com/icon-512.png", mimeType: "image/png", sizes: ["512x512"] }]`; "keeps only the origin of a URL with a path": `mcpIcons("https://egx.example.com/some/path")[0]?.src` is `"https://egx.example.com/favicon-32.png"`.
+  - `tests/unit/server.test.ts` (Node pool): constant `const SERVER_ICONS = [{ src: "https://egx.example.com/icon-192.png", mimeType: "image/png", sizes: ["192x192"] }];`; the `createServer` test calls `createServer(ENV, AUTH, SERVER_ICONS)` and also asserts `responses[1]?.result?.serverInfo` equals `{ name: "egx-mcp", version: "1.0.0", icons: SERVER_ICONS }`.
+  - `tests/helpers/node-mcp.ts`: `createServer(env, NODE_AUTH, [])`.
+  - `tests/helpers/mcp.ts`: `initializeRequest` and `initialize` per plan.md, Amendment 1, Test helpers; `callTool` uses `initializeRequest`.
+  - `tests/contract/server-info.test.ts` (new, Workers pool): imports `clearState, restoreBindings` from `../helpers/bindings`, `initialize` from `../helpers/mcp`, `seedKey, seedUser` from `../helpers/seed`, `mcpIcons` from `../../src/http/icons`; `beforeEach` clears state and seeds a key for `"user@example.com"`; `afterEach` calls `restoreBindings()`; "advertises the EGX MCP icons on the request origin": `(await initialize(key)).serverInfo` equals `{ name: "egx-mcp", version: "1.0.0", icons: mcpIcons("https://egx.test") }` (the test pool sets `PUBLIC_ORIGIN` to empty and `postMcp` calls `https://egx.test/mcp`).
+  Acceptance: typecheck fails on the three-argument `createServer` calls and the contract test fails (no `icons`); after T011 all pass.
+- [x] T011 [US3] Implement per plan.md, Amendment 1, Design: the MCP parts of `src/http/icons.ts` (`import type { Icon }`, `MCP_ICON_SIZES`, `mcpIcons`), `src/mcp/server.ts` (`icons` parameter and `serverInfo.icons`) and `src/auth/oauth-options.ts` (`mcpApiHandler(icons)`, `apiHandler: mcpApiHandler(mcpIcons(origin))`). Acceptance: T010 passes; typecheck clean; `npm test` 0 failures; no import of `src/http` from `src/mcp`.
+
+### Phase 7: Docs and verify
+
+- [x] T012 Docs: in `specs/001-egx-mcp-server/contracts/http-endpoints.md` replace the image row with the two image rows of plan.md, Amendment 1, Contract (naming spec 005, Amendment 1), and add after the table's closing security headers paragraph one sentence: "The MCP `initialize` result lists `serverInfo.icons`: the 32, 192 and 512 px PNGs on the public origin (spec 005, Amendment 1)." Tick T006 to T012 in this file as they finish. Confirm `.mcp.json` is unchanged from the run start (only the `rendobar` server with its `url`, no secret) and is listed as a run file. Acceptance: `git diff` of the contract shows only those lines; no em or en dash added.
+- [x] T013 Verify: `npm run typecheck` (PASS); `npm test` (0 failures, count above 1452). Grep the added lines of the diff: no U+2014, no U+2013, no `Co-Authored`, no comment line in `.ts` files (added lines matching `^\+\s*(//|/\*)`), no new external URL in `src/`. `git status --short` shows only the files listed in the rules, `.mcp.json` and, only if another session left them there, the user's own `specs/001-egx-mcp-server/research.md` and `tasks.md` (never staged); no image file. Render check (reviewer, scratch only, per qa-cases.md QA-009 to QA-011): header at 375, 1024 and 1440 px in light and dark.

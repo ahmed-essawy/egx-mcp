@@ -35,8 +35,8 @@ async function parseRpc(response: Response): Promise<JsonRpcResponse> {
   return JSON.parse(dataLine.slice(DATA_PREFIX.length)) as JsonRpcResponse;
 }
 
-export async function callTool(name: string, args: Record<string, unknown>, bearer: string): Promise<ToolResult> {
-  await postMcp(
+function initializeRequest(bearer: string): Promise<Response> {
+  return postMcp(
     {
       jsonrpc: "2.0",
       id: 1,
@@ -45,6 +45,14 @@ export async function callTool(name: string, args: Record<string, unknown>, bear
     },
     bearer,
   );
+}
+
+export async function initialize(bearer: string): Promise<Record<string, unknown>> {
+  return (await parseRpc(await initializeRequest(bearer))).result as unknown as Record<string, unknown>;
+}
+
+export async function callTool(name: string, args: Record<string, unknown>, bearer: string): Promise<ToolResult> {
+  await initializeRequest(bearer);
   const response = await postMcp(
     { jsonrpc: "2.0", id: 2, method: "tools/call", params: { name, arguments: args } },
     bearer,

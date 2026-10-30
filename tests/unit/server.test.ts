@@ -26,6 +26,7 @@ const USAGE = { globalCalls: 1, globalRowsRead: 2, personalRows: 0, userCalls: 3
 const RETRY_AT = "2026-10-28T00:00:00.000Z";
 const NOW_MS = Date.UTC(2026, 9, 27, 10, 0, 0);
 const NOW_SECONDS = NOW_MS / 1000;
+const SERVER_ICONS = [{ src: "https://egx.example.com/icon-192.png", mimeType: "image/png", sizes: ["192x192"] }];
 const TOOL_RESULT = { content: [{ type: "text" as const, text: "done" }] };
 
 type Registration = {
@@ -232,7 +233,7 @@ describe("defineTool", () => {
 
 describe("createServer", () => {
   it("advertises tools and lists every registered tool", async () => {
-    const server = createServer(ENV, AUTH);
+    const server = createServer(ENV, AUTH, SERVER_ICONS);
     const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
     const responses: Record<number, { result?: Record<string, unknown> }> = {};
     clientTransport.onmessage = (message) => {
@@ -251,6 +252,7 @@ describe("createServer", () => {
     await clientTransport.send({ jsonrpc: "2.0", id: 2, method: "tools/list" });
     await vi.waitFor(() => expect(responses[2]).toBeDefined());
     expect(responses[1]?.result?.capabilities).toMatchObject({ tools: {} });
+    expect(responses[1]?.result?.serverInfo).toEqual({ name: "egx-mcp", version: "1.0.0", icons: SERVER_ICONS });
     const tools = responses[2]?.result?.tools as { name: string }[];
     expect(tools.map((tool) => tool.name)).toEqual([
       "search",

@@ -362,6 +362,8 @@ describe("STYLESHEET", () => {
     expect(STYLESHEET).toContain("header, main, footer {");
     expect(STYLESHEET).toContain("header { display: flex;");
     expect(STYLESHEET).toContain(".affiliation");
+    expect(STYLESHEET).toContain(".brand { display: flex;");
+    expect(STYLESHEET).toContain("text-decoration: none;");
   });
 
   it("styles the footer like the main content and separates it with a border", () => {
@@ -412,7 +414,7 @@ describe("page", () => {
     expect(html.indexOf(ICON_LINKS)).toBeLessThan(html.indexOf('<link rel="stylesheet"'));
   });
 
-  it("shows the linked logo with alt text and the affiliation in a header between the skip link and main", () => {
+  it("shows the linked mark and product name with the affiliation in a header between the skip link and main", () => {
     expect(html).toContain(SITE_HEADER);
     expect(html.indexOf('href="#main"')).toBeLessThan(html.indexOf("<header>"));
     expect(html.indexOf("<header>")).toBeLessThan(html.indexOf("<main"));

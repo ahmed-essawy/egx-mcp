@@ -9,7 +9,7 @@ import {
   logoutHandler,
   revokeKeyHandler,
 } from "./dashboard";
-import { ICONS } from "./icons";
+import { ICONS, type IconAsset } from "./icons";
 import { privacyView, termsView } from "./legal";
 import { STATUS_INTERNAL_ERROR, STATUS_NOT_FOUND, STATUS_OK } from "./status";
 import { HTML_HEADERS, htmlResponse, landingView, mcpUrl, messageView, STYLESHEET } from "./views";
@@ -18,7 +18,6 @@ const CSS_CACHE_CONTROL = "public, max-age=300";
 const CSS_CONTENT_TYPE = "text/css; charset=utf-8";
 const ICON_CACHE_CONTROL = "public, max-age=86400";
 const REGEX_METACHARACTERS = /[.*+?^${}()|[\]\\]/g;
-const PNG_CONTENT_TYPE = "image/png";
 
 type RouteHandler = (request: Request, env: Env, params: string[]) => Response | Promise<Response>;
 type Route = { method: string; pattern: RegExp; handler: RouteHandler };
@@ -27,8 +26,8 @@ function stylesheetResponse(): Response {
   return new Response(STYLESHEET, { headers: { ...HTML_HEADERS, "content-type": CSS_CONTENT_TYPE, "cache-control": CSS_CACHE_CONTROL } });
 }
 
-function iconResponse(body: Uint8Array): Response {
-  return new Response(body, { headers: { ...HTML_HEADERS, "content-type": PNG_CONTENT_TYPE, "cache-control": ICON_CACHE_CONTROL } });
+function iconResponse(icon: IconAsset): Response {
+  return new Response(icon.body, { headers: { ...HTML_HEADERS, "content-type": icon.contentType, "cache-control": ICON_CACHE_CONTROL } });
 }
 
 function exactPath(path: string): RegExp {
@@ -49,10 +48,10 @@ export function internalErrorResponse(): Response {
   return htmlResponse(messageView("Something went wrong", "The request could not be completed."), STATUS_INTERNAL_ERROR);
 }
 
-const ICON_ROUTES: Route[] = [...ICONS].map(([path, body]) => ({
+const ICON_ROUTES: Route[] = [...ICONS].map(([path, icon]) => ({
   method: "GET",
   pattern: exactPath(path),
-  handler: () => iconResponse(body),
+  handler: () => iconResponse(icon),
 }));
 
 const ROUTES: Route[] = [
