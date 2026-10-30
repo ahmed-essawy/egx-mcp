@@ -165,6 +165,8 @@ Retry messages tell you when to try again:
 
 The limits are settings in `wrangler.jsonc` (or the Cloudflare dashboard). Changing them needs no code change.
 
+Sign-in endpoints at the edge (recommended owner action): the OAuth guard lets each IP address make 10 guarded requests per minute to `/token`, `/register`, `/authorize` and `/callback/google`, so one address can still pass about 14,400 guarded requests a day. To stop bursts before they reach the Worker, add a Cloudflare WAF rate limiting rule that counts by IP with the expression `http.request.uri.path in {"/token" "/register" "/authorize" "/callback/google"}`. The Free plan allows one such rule, with a 10 second counting period and a 10 second block, so it cuts bursts but sets no daily cap. WAF rules apply only when the Worker is served from a custom domain or route on a Cloudflare zone, not on `workers.dev`.
+
 ## Install and deploy from a clean Windows machine
 
 Prerequisites:

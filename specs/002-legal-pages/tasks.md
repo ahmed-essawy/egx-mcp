@@ -38,4 +38,4 @@
 
 ## Phase 5: Verify
 
-- [ ] T008 Run `npm run typecheck`, the Node-pool unit run and `npm run check:readme`. Acceptance: typecheck clean; no failure beyond the 8 known Workers-only failures; README check passed. Record the Workers pool as NOT RUN (compatibility date blocker).
+- [x] T008 Run `npm run typecheck`, the Node-pool unit run and `npm run check:readme`. Acceptance: typecheck clean; no failure beyond the 8 known Workers-only failures; README check passed. Record the Workers pool as NOT RUN (compatibility date blocker).
