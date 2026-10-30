@@ -102,6 +102,10 @@ Not available from current sources until a risk closes (tools return `not_availa
 - **Wrong ratio recovery (C20)**: decision `admin revert_action`, not a documented SQL recovery, because hand-run SQL would bypass the apply gate (backfill loading, daily cap, once-only) that keeps INV-1 to INV-8 and the hard D1 cap, while the tool reuses the same gated batch with factor `1 / f`; per-kind ratio validation (bonus 0 to 10, split above 1, reverse split below 1) blocks the inversion error first.
 - **Alternatives**: TradingView chart websocket for history (undocumented protocol, raw and adjusted both available; kept as a fallback, Q1); investing.com (bot protection); EGX historical pages (not reachable).
 
+### Probe results
+
+- **2026-10-31, owner decision: probe not run.** The deployed Worker serves live data from TradingView (primary) and Mubasher (backup) in production, which proves both sources answer from Cloudflare, so `STOCK_PROVIDERS` stays `"tradingview,mubasher"`. Whether egx.com.eg is reachable from Cloudflare stays unknown (from a desktop the server resets the connection); an EGX provider is a possible future spec, not part of this one. The Workers rate limiter (risk K2) is checked instead on the live Worker with 11 quick calls from one non-unlimited API key; T032 is built only if the eleventh call is served.
+
 ## R4. Stack and versions (npm registry, 2026-10-25)
 
 | Package | Version | Note |
