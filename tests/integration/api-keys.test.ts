@@ -1,4 +1,4 @@
-import { SELF, env } from "cloudflare:test";
+import { env, exports } from "cloudflare:workers";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createSessionCookie } from "../../src/auth/session";
 import { decodeBase64Url } from "../helpers/base64url";
@@ -36,7 +36,7 @@ async function signIn(email: string): Promise<Caller> {
 }
 
 function postForm(path: string, caller: Caller, fields: Record<string, string> = {}): Promise<Response> {
-  return SELF.fetch(`${ORIGIN}${path}`, {
+  return exports.default.fetch(`${ORIGIN}${path}`, {
     method: "POST",
     headers: { cookie: caller.cookie, origin: ORIGIN, "content-type": "application/x-www-form-urlencoded" },
     body: new URLSearchParams({ csrf: caller.csrf, ...fields }),
@@ -45,7 +45,7 @@ function postForm(path: string, caller: Caller, fields: Record<string, string> =
 }
 
 function getDashboard(caller: Caller): Promise<Response> {
-  return SELF.fetch(`${ORIGIN}/dashboard`, { headers: { cookie: caller.cookie } });
+  return exports.default.fetch(`${ORIGIN}/dashboard`, { headers: { cookie: caller.cookie } });
 }
 
 function createKey(caller: Caller, name = "laptop"): Promise<Response> {

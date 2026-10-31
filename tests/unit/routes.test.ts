@@ -1,4 +1,4 @@
-import { env } from "cloudflare:test";
+import { env } from "cloudflare:workers";
 import { describe, expect, it } from "vitest";
 import { privacyView, termsView } from "../../src/http/legal";
 import { defaultHandler } from "../../src/http/routes";
@@ -9,6 +9,9 @@ const SERVER_ERROR = 500;
 const NOT_FOUND = 404;
 const PNG_SIGNATURE = [137, 80, 78, 71, 13, 10, 26, 10];
 const ICON_CACHE_CONTROL = "public, max-age=86400";
+const CSS_CACHE_CONTROL = "public, max-age=300";
+const ANY_ORIGIN = "*";
+const HTML_CSP = "default-src 'self'; frame-ancestors 'none'";
 const WIDTH_OFFSET = 16;
 const HEIGHT_OFFSET = 20;
 const COLOR_TYPE_OFFSET = 25;
@@ -53,7 +56,7 @@ describe("defaultHandler", () => {
     const response = await call("/", "GET", envWith("https://egx.configured.test"));
     expect(response.status).toBe(200);
     expect(response.headers.get("content-type")).toContain("text/html");
-    expect(response.headers.get("content-security-policy")).toBe("default-src 'self'; frame-ancestors 'none'");
+    expect(response.headers.get("content-security-policy")).toBe(HTML_CSP);
     expect(response.headers.get("cache-control")).toBe("no-store");
     expect(response.headers.get("set-cookie")).toBeNull();
     const body = await response.text();
@@ -76,6 +79,9 @@ describe("defaultHandler", () => {
     expect(response.status).toBe(200);
     expect(response.headers.get("content-type")).toContain("text/css");
     expect(response.headers.get("x-content-type-options")).toBe("nosniff");
+    expect(response.headers.get("content-security-policy")).toBe(HTML_CSP);
+    expect(response.headers.get("cache-control")).toBe(CSS_CACHE_CONTROL);
+    expect(response.headers.get("access-control-allow-origin")).toBeNull();
     expect(await response.text()).toContain("body {");
   });
 
@@ -91,6 +97,9 @@ describe("defaultHandler", () => {
     expect(response.headers.get("content-type")).toBe("image/png");
     expect(response.headers.get("cache-control")).toBe(ICON_CACHE_CONTROL);
     expect(response.headers.get("x-content-type-options")).toBe("nosniff");
+    expect(response.headers.get("access-control-allow-origin")).toBe(ANY_ORIGIN);
+    expect(response.headers.get("content-security-policy")).toBeNull();
+    expect(response.headers.get("referrer-policy")).toBeNull();
     expect(response.headers.get("set-cookie")).toBeNull();
     const bytes = new Uint8Array(await response.arrayBuffer());
     expect(Array.from(bytes.slice(0, PNG_SIGNATURE.length))).toEqual(PNG_SIGNATURE);
@@ -109,6 +118,9 @@ describe("defaultHandler", () => {
     expect(response.headers.get("content-type")).toBe(ICO_CONTENT_TYPE);
     expect(response.headers.get("cache-control")).toBe(ICON_CACHE_CONTROL);
     expect(response.headers.get("x-content-type-options")).toBe("nosniff");
+    expect(response.headers.get("access-control-allow-origin")).toBe(ANY_ORIGIN);
+    expect(response.headers.get("content-security-policy")).toBeNull();
+    expect(response.headers.get("referrer-policy")).toBeNull();
     expect(response.headers.get("set-cookie")).toBeNull();
     const bytes = new Uint8Array(await response.arrayBuffer());
     const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);

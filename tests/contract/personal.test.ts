@@ -1,4 +1,4 @@
-import { env } from "cloudflare:test";
+import { env } from "cloudflare:workers";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { DirectorySymbol, QuoteEntry } from "../../src/store/kv";
 import { MAX_HOLDING_NUMBER } from "../../src/mcp/tools/personal";

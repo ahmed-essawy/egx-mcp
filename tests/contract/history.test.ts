@@ -1,4 +1,4 @@
-import { env } from "cloudflare:test";
+import { env } from "cloudflare:workers";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { ApplyCandidate } from "../../src/domain/adjust";
 import { ADJUST_BATCH_OVERHEAD_ROWS } from "../../src/domain/budget";

@@ -1,4 +1,4 @@
-import { env } from "cloudflare:test";
+import { env } from "cloudflare:workers";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { clearState, restoreBindings } from "../helpers/bindings";
 import { MARKET_ISINS, MOVERS_IN_SNAPSHOT, marketSnapshot } from "../helpers/market";

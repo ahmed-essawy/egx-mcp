@@ -1,4 +1,4 @@
-import { env } from "cloudflare:test";
+import { env } from "cloudflare:workers";
 import { vi } from "vitest";
 import { MS_PER_SECOND } from "./time";
 import type { Directory, DirectoryFund, DirectorySymbol, Snapshot, Stats, SymbolStatus } from "../../src/store/kv";

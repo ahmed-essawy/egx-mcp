@@ -1,4 +1,4 @@
-import { env } from "cloudflare:test";
+import { env } from "cloudflare:workers";
 import { __resetConfigCache } from "../../src/config";
 
 type BindingOverrides = Record<string, string>;

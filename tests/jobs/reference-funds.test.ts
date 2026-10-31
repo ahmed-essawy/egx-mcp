@@ -1,4 +1,4 @@
-import { env } from "cloudflare:test";
+import { env } from "cloudflare:workers";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { normalizeArabic } from "../../src/domain/arabic";
 import { referenceJob } from "../../src/jobs/reference";

@@ -1,4 +1,4 @@
-import { env } from "cloudflare:test";
+import { env } from "cloudflare:workers";
 import { createSessionCookie } from "../../src/auth/session";
 import { decodeBase64Url } from "./base64url";
 import { cookiePair } from "./cookies";

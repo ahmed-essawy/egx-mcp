@@ -1,4 +1,4 @@
-import { env } from "cloudflare:test";
+import { env } from "cloudflare:workers";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { referenceJob } from "../../src/jobs/reference";
 import { mapMubasherActionKind, parseMubasherActionRow } from "../../src/providers/mubasher";

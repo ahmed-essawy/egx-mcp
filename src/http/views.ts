@@ -1,6 +1,7 @@
 import { CSRF_FIELD } from "../auth/session";
 import { utcDay } from "../domain/calendar";
 import type { ApiKeySummary } from "../store/d1/users";
+import { LOGO_PATH, PAGE_ICONS, type PageIcon } from "./icons";
 
 export const KEY_NAME_MAX_LENGTH = 40;
 const NEVER_USED = "never";
@@ -9,11 +10,6 @@ export const HOME_PATH = "/";
 export const PRIVACY_PATH = "/privacy";
 export const TERMS_PATH = "/terms";
 const STYLESHEET_PATH = "/styles.css";
-export const FAVICON_PATH = "/favicon-32.png";
-export const ICON_PATH = "/icon-192.png";
-export const APPLE_TOUCH_ICON_PATH = "/apple-touch-icon.png";
-export const LARGE_ICON_PATH = "/icon-512.png";
-export const LOGO_PATH = "/logo-96.png";
 const LOGO_SIZE = 48;
 const AFFILIATION = "Independent service, not affiliated with the Egyptian Exchange.";
 export const MCP_PATH = "/mcp";
@@ -204,12 +200,13 @@ function noticeSection(): string {
   return `<p class="notice">${escapeHtml(NOTICE)}</p>`;
 }
 
+function iconLink(icon: PageIcon): string {
+  const typeAttribute = icon.rel === "icon" ? ` type="${icon.contentType}"` : "";
+  return `<link rel="${icon.rel}"${typeAttribute} sizes="${icon.sizes}" href="${icon.path}">`;
+}
+
 function iconLinks(): string {
-  return [
-    `<link rel="icon" type="image/png" sizes="32x32" href="${FAVICON_PATH}">`,
-    `<link rel="icon" type="image/png" sizes="192x192" href="${ICON_PATH}">`,
-    `<link rel="apple-touch-icon" sizes="180x180" href="${APPLE_TOUCH_ICON_PATH}">`,
-  ].join("\n");
+  return PAGE_ICONS.map(iconLink).join("\n");
 }
 
 function siteHeader(): string {

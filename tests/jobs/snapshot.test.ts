@@ -1,4 +1,4 @@
-import { env } from "cloudflare:test";
+import { env } from "cloudflare:workers";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { SECONDS_PER_DAY } from "../../src/domain/calendar";
 import { snapshotJob } from "../../src/jobs/snapshot";

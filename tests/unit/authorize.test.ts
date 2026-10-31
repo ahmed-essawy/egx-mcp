@@ -1,4 +1,4 @@
-import { env as workerEnv } from "cloudflare:test";
+import { env as workerEnv } from "cloudflare:workers";
 import { describe, expect, it } from "vitest";
 import { authorizeHandler, grantedScopes } from "../../src/http/authorize";
 

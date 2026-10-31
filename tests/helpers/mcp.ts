@@ -1,4 +1,4 @@
-import { SELF } from "cloudflare:test";
+import { exports } from "cloudflare:workers";
 import { expect } from "vitest";
 
 const MCP_URL = "https://egx.test/mcp";
@@ -22,7 +22,7 @@ export function postMcp(body: JsonRpcRequest, bearer?: string): Promise<Response
     accept: "application/json, text/event-stream",
   };
   if (bearer) headers.authorization = `Bearer ${bearer}`;
-  return SELF.fetch(MCP_URL, { method: "POST", headers, body: JSON.stringify(body) });
+  return exports.default.fetch(MCP_URL, { method: "POST", headers, body: JSON.stringify(body) });
 }
 
 async function parseRpc(response: Response): Promise<JsonRpcResponse> {

@@ -1,4 +1,4 @@
-import { env } from "cloudflare:test";
+import { env } from "cloudflare:workers";
 import { getJobState } from "../../src/store/d1/jobs";
 import { __resetKvMemo, type Directory } from "../../src/store/kv";
 import { bindMember } from "./bind";

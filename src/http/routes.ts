@@ -17,6 +17,11 @@ import { HTML_HEADERS, htmlResponse, landingView, mcpUrl, messageView, STYLESHEE
 const CSS_CACHE_CONTROL = "public, max-age=300";
 const CSS_CONTENT_TYPE = "text/css; charset=utf-8";
 const ICON_CACHE_CONTROL = "public, max-age=86400";
+const IMAGE_HEADERS: Record<string, string> = {
+  "cache-control": ICON_CACHE_CONTROL,
+  "x-content-type-options": "nosniff",
+  "access-control-allow-origin": "*",
+};
 const REGEX_METACHARACTERS = /[.*+?^${}()|[\]\\]/g;
 
 type RouteHandler = (request: Request, env: Env, params: string[]) => Response | Promise<Response>;
@@ -27,7 +32,7 @@ function stylesheetResponse(): Response {
 }
 
 function iconResponse(icon: IconAsset): Response {
-  return new Response(icon.body, { headers: { ...HTML_HEADERS, "content-type": icon.contentType, "cache-control": ICON_CACHE_CONTROL } });
+  return new Response(icon.body, { headers: { ...IMAGE_HEADERS, "content-type": icon.contentType } });
 }
 
 function exactPath(path: string): RegExp {

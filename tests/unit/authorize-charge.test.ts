@@ -1,5 +1,5 @@
 import { AuthorizationError } from "@cloudflare/workers-oauth-provider";
-import { env as workerEnv } from "cloudflare:test";
+import { env as workerEnv } from "cloudflare:workers";
 import { beforeEach, describe, expect, it } from "vitest";
 import { authorizeDecisionHandler, authorizeHandler, googleCallbackHandler } from "../../src/http/authorize";
 

@@ -1,4 +1,4 @@
-import { SELF, env } from "cloudflare:test";
+import { env, exports } from "cloudflare:workers";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { toBase64Url } from "../../src/domain/crypto";
 import { encodeBase64Url } from "../helpers/base64url";
@@ -106,7 +106,7 @@ async function createVerifierPair(): Promise<{ verifier: string; challenge: stri
 }
 
 function registerClient(): Promise<Response> {
-  return SELF.fetch(`${ORIGIN}/register`, {
+  return exports.default.fetch(`${ORIGIN}/register`, {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify({
@@ -135,13 +135,13 @@ async function openConsent(clientId: string, challenge: string, scope = BOTH_SCO
     code_challenge: challenge,
     code_challenge_method: "S256",
   });
-  const response = await SELF.fetch(`${ORIGIN}/authorize?${query}`, { redirect: "manual" });
+  const response = await exports.default.fetch(`${ORIGIN}/authorize?${query}`, { redirect: "manual" });
   const html = await response.clone().text();
   return { response, html, handle: HANDLE_PATTERN.exec(html)?.[1] ?? "" };
 }
 
 function decide(consent: Consent, decision: "approve" | "deny"): Promise<Response> {
-  return SELF.fetch(`${ORIGIN}/authorize`, {
+  return exports.default.fetch(`${ORIGIN}/authorize`, {
     method: "POST",
     headers: { cookie: cookieHeader(consent.response), "content-type": "application/x-www-form-urlencoded" },
     body: new URLSearchParams({ handle: consent.handle, decision }),
@@ -151,7 +151,7 @@ function decide(consent: Consent, decision: "approve" | "deny"): Promise<Respons
 
 function googleCallback(approved: Response): Promise<Response> {
   const state = new URL(approved.headers.get("location") ?? "").searchParams.get("state") ?? "";
-  return SELF.fetch(`${ORIGIN}/callback/google?${new URLSearchParams({ code: GOOGLE_CODE, state })}`, {
+  return exports.default.fetch(`${ORIGIN}/callback/google?${new URLSearchParams({ code: GOOGLE_CODE, state })}`, {
     headers: { cookie: cookieHeader(approved) },
     redirect: "manual",
   });
@@ -159,7 +159,7 @@ function googleCallback(approved: Response): Promise<Response> {
 
 function exchangeCode(clientId: string, verifier: string, callback: Response): Promise<Response> {
   const code = new URL(callback.headers.get("location") ?? "").searchParams.get("code") ?? "";
-  return SELF.fetch(`${ORIGIN}/token`, {
+  return exports.default.fetch(`${ORIGIN}/token`, {
     method: "POST",
     headers: { "content-type": "application/x-www-form-urlencoded" },
     body: new URLSearchParams({
@@ -226,7 +226,7 @@ async function seedPersonalRows(rows: number): Promise<void> {
 }
 
 function postDashboard(path: string, session: DashboardSession, fields: Record<string, string>): Promise<Response> {
-  return SELF.fetch(`${ORIGIN}${path}`, {
+  return exports.default.fetch(`${ORIGIN}${path}`, {
     method: "POST",
     headers: { cookie: session.cookie, origin: ORIGIN, "content-type": "application/x-www-form-urlencoded" },
     body: new URLSearchParams({ csrf: session.csrf, ...fields }),
@@ -423,7 +423,7 @@ describe("oauth sign-in", () => {
     });
 
     it("charges nothing for an /authorize request that validation refuses", async () => {
-      const response = await SELF.fetch(`${ORIGIN}/authorize?x=1`, { redirect: "manual" });
+      const response = await exports.default.fetch(`${ORIGIN}/authorize?x=1`, { redirect: "manual" });
 
       expect(response.status).toBe(400);
       expect(await readOauthWrites()).toBe(0);
@@ -431,7 +431,7 @@ describe("oauth sign-in", () => {
     });
 
     it("charges nothing for a /callback/google request with an unknown state", async () => {
-      const response = await SELF.fetch(`${ORIGIN}/callback/google?code=x&state=unknown`, { redirect: "manual" });
+      const response = await exports.default.fetch(`${ORIGIN}/callback/google?code=x&state=unknown`, { redirect: "manual" });
 
       expect(response.status).toBe(400);
       expect(await readOauthWrites()).toBe(0);
@@ -441,9 +441,9 @@ describe("oauth sign-in", () => {
       const limiter = vi.spyOn(env.RATE_LIMITER, "limit").mockResolvedValue({ success: false });
       const headers = { "cf-connecting-ip": "203.0.113.7" };
 
-      const authorize = await SELF.fetch(`${ORIGIN}/authorize?x=1`, { headers, redirect: "manual" });
-      const token = await SELF.fetch(`${ORIGIN}/token`, { method: "POST", headers, body: "grant_type=authorization_code" });
-      const register = await SELF.fetch(`${ORIGIN}/register`, { method: "POST", headers, body: "{}" });
+      const authorize = await exports.default.fetch(`${ORIGIN}/authorize?x=1`, { headers, redirect: "manual" });
+      const token = await exports.default.fetch(`${ORIGIN}/token`, { method: "POST", headers, body: "grant_type=authorization_code" });
+      const register = await exports.default.fetch(`${ORIGIN}/register`, { method: "POST", headers, body: "{}" });
 
       expect(authorize.status).toBe(429);
       expect(authorize.headers.get("content-type")).toContain("text/html");
@@ -457,14 +457,14 @@ describe("oauth sign-in", () => {
     it("does not limit the landing page, public pages or /mcp by IP", async () => {
       const limiter = vi.spyOn(env.RATE_LIMITER, "limit").mockResolvedValue({ success: false });
 
-      expect((await SELF.fetch(`${ORIGIN}/`)).status).toBe(200);
-      expect((await SELF.fetch(`${ORIGIN}/privacy`)).status).toBe(200);
+      expect((await exports.default.fetch(`${ORIGIN}/`)).status).toBe(200);
+      expect((await exports.default.fetch(`${ORIGIN}/privacy`)).status).toBe(200);
       expect(limiter).not.toHaveBeenCalled();
     });
 
     it("makes no usage_global call for the landing page, public pages or an unauthenticated /mcp", async () => {
-      const landing = await SELF.fetch(`${ORIGIN}/`);
-      const privacy = await SELF.fetch(`${ORIGIN}/privacy`);
+      const landing = await exports.default.fetch(`${ORIGIN}/`);
+      const privacy = await exports.default.fetch(`${ORIGIN}/privacy`);
       const unauthenticated = await postMcp({ jsonrpc: "2.0", id: 1, method: "tools/list" });
 
       expect(landing.status).toBe(200);
@@ -533,8 +533,8 @@ describe("oauth sign-in", () => {
       const userId = await seedUser(USER_EMAIL);
       const session = await dashboardSession(userId, GIVEN_NOW);
 
-      const privacy = await (await SELF.fetch(`${ORIGIN}/privacy`)).text();
-      const dashboard = await (await SELF.fetch(`${ORIGIN}/dashboard`, { headers: { cookie: session.cookie } })).text();
+      const privacy = await (await exports.default.fetch(`${ORIGIN}/privacy`)).text();
+      const dashboard = await (await exports.default.fetch(`${ORIGIN}/dashboard`, { headers: { cookie: session.cookie } })).text();
 
       expect(privacy).not.toContain("until a delete button is available");
       expect(privacy).toContain("Delete account");
