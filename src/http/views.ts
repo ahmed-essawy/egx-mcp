@@ -1,29 +1,23 @@
 import { CSRF_FIELD } from "../auth/session";
 import { utcDay } from "../domain/calendar";
 import type { ApiKeySummary } from "../store/d1/users";
+import { LOCALIZED, SITE, type Lang } from "../site/identity";
+import { FOOTER_LINKS, type FooterLink, HOME_PATH, PRIVACY_PATH, TERMS_PATH } from "../site/paths";
 import { LOGO_PATH, PAGE_ICONS, type PageIcon } from "./icons";
 
 export const KEY_NAME_MAX_LENGTH = 40;
 const NEVER_USED = "never";
 const UNKNOWN_DATE = "unknown";
-export const HOME_PATH = "/";
-export const PRIVACY_PATH = "/privacy";
-export const TERMS_PATH = "/terms";
-const STYLESHEET_PATH = "/styles.css";
+export const STYLESHEET_PATH = "/styles.css";
 const LOGO_SIZE = 48;
-const AFFILIATION = "Independent service, not affiliated with the Egyptian Exchange.";
 export const MCP_PATH = "/mcp";
 export const DASHBOARD_PATH = "/dashboard";
-const BEARER_HEADER = "Authorization: Bearer <your key>";
-const PRODUCT_NAME = "EGX MCP";
-const GITHUB_URL = "https://github.com/ahmed-essawy/egx-mcp";
-const VALUE_LINE = "Ask your AI assistant about Egyptian Exchange stocks and indices. Data is delayed.";
-const CONNECT_NOTE =
-  "Claude, ChatGPT and Cursor connect with Google sign-in or with an API key header. Create your key after signing in.";
+export const BEARER_HEADER = "Authorization: Bearer <your key>";
+export const VALUE_LINE = "Ask your AI assistant about Egyptian Exchange stocks and indices. Data is delayed.";
+export const CONNECT_NOTE =
+  "Claude and ChatGPT connect with Google sign-in, Claude Code with either, and Cursor with an API key header. Create your key after signing in.";
 const UNVERIFIED_CLIENT_NOTICE = "This app registered itself; its name is not verified.";
 const LOOPBACK_WARNING = "Access will be sent to an app on your own computer. Any program on this computer could receive it.";
-const NOTICE =
-  "Data is delayed, unofficial and for information only, not financial advice. Sources: EGX website, TradingView, Mubasher Info, iSagha.";
 export const DATA_SOURCES = [
   "EGX website",
   "TradingView",
@@ -73,15 +67,27 @@ code { font-family: ui-monospace, monospace; overflow-wrap: anywhere; }
 .connect h2 { font-size: 1rem; margin: 0 0 0.5rem; }
 .connect code { display: block; margin-block: 0.5rem; padding: 0.5rem 0.75rem; border: 1px solid var(--border); background: var(--background); }
 .connect p { margin-block: 0.75rem 0; }
+[dir="rtl"] th, [dir="rtl"] td { text-align: right; }
+pre { overflow-x: auto; padding: 0.75rem; border: 1px solid var(--border); background: var(--surface); }
+.updated { color: var(--muted); font-size: 0.875rem; }
+h3 code { font-size: 1rem; }
+.breadcrumb { display: flex; flex-wrap: wrap; gap: 0.5rem; list-style: none; padding: 0; margin: 0 0 1rem; font-size: 0.875rem; }
 `;
 
-export const HTML_HEADERS: Record<string, string> = {
+export const SECURITY_HEADERS: Record<string, string> = {
   "content-type": "text/html; charset=utf-8",
   "content-security-policy": "default-src 'self'; frame-ancestors 'none'",
   "x-content-type-options": "nosniff",
   "referrer-policy": "same-origin",
-  "cache-control": "no-store",
 };
+
+export const HTML_HEADERS: Record<string, string> = {
+  ...SECURITY_HEADERS,
+  "cache-control": "no-store",
+  "x-robots-tag": "noindex, nofollow",
+};
+
+export type DocumentParts = { lang: Lang; dir: "ltr" | "rtl"; head: string; body: string };
 
 export type ConsentInput = {
   clientName: string;
@@ -114,25 +120,43 @@ export function htmlResponse(html: string, status: number, cookies: string[] = [
   return new Response(html, { status, headers: withCookies(new Headers(HTML_HEADERS), cookies) });
 }
 
-export function page(title: string, bodyHtml: string): string {
+export function htmlDocument({ lang, dir, head, body }: DocumentParts): string {
   return `<!doctype html>
-<html lang="en">
+<html lang="${lang}" dir="${dir}">
 <head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>${escapeHtml(title)}</title>
-${iconLinks()}
-<link rel="stylesheet" href="${STYLESHEET_PATH}">
+${head}
 </head>
 <body>
-<a class="skip-link" href="#main">Skip to main content</a>
-${siteHeader()}
-<main id="main">
-${bodyHtml}
-</main>
-${siteFooter()}
+${body}
 </body>
 </html>`;
+}
+
+export function documentBody(lang: Lang, mainHtml: string): string {
+  return `<a class="skip-link" href="#main">${escapeHtml(LOCALIZED[lang].skipLink)}</a>
+${siteHeader(lang)}
+<main id="main">
+${mainHtml}
+</main>
+${siteFooter(lang)}`;
+}
+
+export function baseHeadTags(): string[] {
+  return [
+    '<meta charset="utf-8">',
+    '<meta name="viewport" content="width=device-width, initial-scale=1">',
+    iconLinks(),
+    `<link rel="stylesheet" href="${STYLESHEET_PATH}">`,
+  ];
+}
+
+export function page(title: string, bodyHtml: string): string {
+  const head = [
+    ...baseHeadTags(),
+    '<meta name="robots" content="noindex, nofollow">',
+    `<title>${escapeHtml(title)}</title>`,
+  ].join("\n");
+  return htmlDocument({ lang: "en", dir: "ltr", head, body: documentBody("en", bodyHtml) });
 }
 
 export function messageView(title: string, text: string): string {
@@ -141,10 +165,6 @@ export function messageView(title: string, text: string): string {
 
 export function mcpUrl(origin: string): string {
   return new URL(MCP_PATH, origin).href;
-}
-
-export function landingView(serverUrl: string): string {
-  return page(PRODUCT_NAME, [heroSection(), connectSection(serverUrl), noticeSection()].join("\n"));
 }
 
 export function consentView(input: ConsentInput): string {
@@ -178,16 +198,16 @@ export function dashboardView(input: DashboardInput): string {
   return page("Dashboard", body.filter((section) => section !== "").join("\n"));
 }
 
-function heroSection(): string {
+export function heroSection(): string {
   return `<section class="hero" aria-labelledby="hero-title">
-<h1 id="hero-title">${escapeHtml(PRODUCT_NAME)}</h1>
+<h1 id="hero-title">${escapeHtml(SITE.name)}</h1>
 <p class="lead">${escapeHtml(VALUE_LINE)}</p>
 <p><a class="button" href="${DASHBOARD_PATH}">Sign in</a></p>
 ${agreementNotice("signing in")}
 </section>`;
 }
 
-function connectSection(serverUrl: string): string {
+export function connectSection(serverUrl: string): string {
   return `<section class="connect" aria-labelledby="connect-title">
 <h2 id="connect-title">Connect your assistant</h2>
 <code>${escapeHtml(serverUrl)}</code>
@@ -196,25 +216,25 @@ function connectSection(serverUrl: string): string {
 </section>`;
 }
 
-function noticeSection(): string {
-  return `<p class="notice">${escapeHtml(NOTICE)}</p>`;
-}
-
 function iconLink(icon: PageIcon): string {
   const typeAttribute = icon.rel === "icon" ? ` type="${icon.contentType}"` : "";
   return `<link rel="${icon.rel}"${typeAttribute} sizes="${icon.sizes}" href="${icon.path}">`;
 }
 
-function iconLinks(): string {
+export function iconLinks(): string {
   return PAGE_ICONS.map(iconLink).join("\n");
 }
 
-function siteHeader(): string {
-  return `<header><a class="brand" href="${HOME_PATH}"><img src="${LOGO_PATH}" alt="" width="${LOGO_SIZE}" height="${LOGO_SIZE}">${escapeHtml(PRODUCT_NAME)}</a><p class="affiliation">${escapeHtml(AFFILIATION)}</p></header>`;
+export function siteHeader(lang: Lang): string {
+  return `<header><a class="brand" href="${HOME_PATH}"><img src="${LOGO_PATH}" alt="" width="${LOGO_SIZE}" height="${LOGO_SIZE}">${escapeHtml(SITE.name)}</a><p class="affiliation">${escapeHtml(LOCALIZED[lang].affiliation)}</p></header>`;
 }
 
-function siteFooter(): string {
-  return `<footer><nav aria-label="Site"><a href="${HOME_PATH}">Home</a> ${PRIVACY_LINK} ${TERMS_LINK} <a href="${GITHUB_URL}">GitHub</a></nav></footer>`;
+function footerLink({ label, href }: FooterLink): string {
+  return `<a href="${escapeHtml(href)}">${escapeHtml(label)}</a>`;
+}
+
+export function siteFooter(lang: Lang): string {
+  return `<footer><nav aria-label="Site">${FOOTER_LINKS[lang].map(footerLink).join(" ")}</nav></footer>`;
 }
 
 function agreementNotice(action: string): string {

@@ -2,7 +2,9 @@ import { OAuthProvider } from "@cloudflare/workers-oauth-provider";
 import { oauthOptions } from "./auth/oauth-options";
 import { loadConfig, resolvePublicOrigin } from "./config";
 import { nowSeconds } from "./domain/calendar";
-import { defaultHandler, internalErrorResponse } from "./http/routes";
+import { serverCardResponse } from "./http/public";
+import { internalErrorResponse } from "./http/responses";
+import { defaultHandler } from "./http/routes";
 import { scheduled } from "./jobs/dispatch";
 import { guardOauthEntry } from "./limits/oauth-guard";
 
@@ -24,6 +26,15 @@ function providerFor(request: Request, env: Env): OAuthProvider<Env> | null {
   }
 }
 
+async function discoveryResponse(request: Request, env: Env): Promise<Response | null> {
+  try {
+    return await serverCardResponse(request, env);
+  } catch (error) {
+    console.error("server_card_failed", error instanceof Error ? error.message : "unknown");
+    return internalErrorResponse();
+  }
+}
+
 async function guardedResponse(request: Request, env: Env): Promise<Response | null> {
   try {
     return await guardOauthEntry(env, loadConfig(env), request, nowSeconds());
@@ -35,6 +46,8 @@ async function guardedResponse(request: Request, env: Env): Promise<Response | n
 
 export default {
   fetch: async (request, env, ctx) => {
+    const card = await discoveryResponse(request, env);
+    if (card !== null) return card;
     const refused = await guardedResponse(request, env);
     if (refused !== null) return refused;
     const provider = providerFor(request, env);

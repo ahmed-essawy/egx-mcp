@@ -334,8 +334,6 @@ export function registerHistoryTools(server: McpServer, env: Env, auth: AuthProp
     server,
     {
       name: "get_price_history",
-      description:
-        "Get end-of-day price history (raw, adjusted or both) for one Egyptian stock over a range of at most 5 years, 500 bars per page.",
       inputSchema: historyInputSchema,
       outputSchema: historyOutputSchema,
       readOnly: true,
@@ -348,8 +346,6 @@ export function registerHistoryTools(server: McpServer, env: Env, auth: AuthProp
     server,
     {
       name: "compare_symbols",
-      description:
-        "Compare 2 to 5 Egyptian stocks over a range of at most 5 years: return, high, low and total volume from adjusted end-of-day prices.",
       inputSchema: compareInputSchema,
       outputSchema: compareOutputSchema,
       readOnly: true,

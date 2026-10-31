@@ -38,6 +38,7 @@ describe("ICONS", () => {
         ["/icon-512.png", PNG],
         ["/favicon.ico", "image/x-icon"],
         ["/logo-96.png", PNG],
+        ["/og-image.png", PNG],
       ]),
     );
   });

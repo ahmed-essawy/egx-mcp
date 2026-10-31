@@ -1,6 +1,8 @@
 import { utcDay } from "../../domain/calendar";
 import type { ReadResult } from "./users";
 
+export const MAX_SINCE_AGE_DAYS = 30;
+
 export type NoticeKind = "new_listing" | "job_failed" | "needs_ratio" | "fund_stale" | "source_switched";
 export type NoticeStatus = "open" | "done";
 export type EventKind = "new_nav" | "big_move" | "new_listing" | "corporate_action" | "disclosure";

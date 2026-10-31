@@ -99,6 +99,8 @@ describe("oauth guard", () => {
       expect(response?.status).toBe(503);
       expect(response?.headers.get("retry-after")).toBe(String(SECONDS_TO_MIDNIGHT));
       expect(response?.headers.get("content-type")).toBe("text/html; charset=utf-8");
+      expect(response?.headers.get("x-robots-tag")).toBe("noindex, nofollow");
+      expect(response?.headers.get("cache-control")).toBe("no-store");
       expect(await response?.text()).toContain("Sign-in is at capacity for today. Try again after 00:00 UTC.");
       expect(counter()).toBe(CAP);
     });

@@ -1,0 +1,68 @@
+# QA results: Search and AI discoverability
+
+Run date: 2026-10-31. Workspace `D:/Work/EGX MCP`, branch `feat/seo-ai-discoverability`, base a8ecf9b, all changes uncommitted.
+
+QA: PASS
+
+Counts: 34 PASS, 0 FAIL, 9 NOT RUN (43 cases). QA-003, QA-014, QA-029 and QA-043 are PASS on their automated and local parts; their external parts are listed under NOT RUN reasons below.
+
+## Evidence base
+
+- `npm run typecheck`: clean. `npm run check:readme`: "README check passed". `npm test`: 88 files, 2341 tests, 0 failures (136 s).
+- Local servers: `npx wrangler dev --var PUBLIC_ORIGIN:http://localhost:8787 --port 8787` and a second one with `PUBLIC_ORIGIN:https://egx.example.org --port 8788` (local mode, never `--remote`). Both stopped afterwards, no workerd left running.
+- Lighthouse 13 (mobile, simulated throttling), re-run today against current code on `/`, `/connect/claude`, `/faq`: seo 1, accessibility 1, best practices 1, performance 1; LCP 0.8 s, CLS 0. Raw JSON in `.git/pipeline/seo-ai-discoverability/lighthouse/qa/`.
+- QA-034 mutation ran in a scratch copy outside the repo (deleted afterwards); the repo was not edited.
+
+## Results
+
+| Id | Pri | Type | Result | Evidence or reason | Date |
+|---|---|---|---|---|---|
+| QA-001 | 1 | automated + manual | PASS | `crawl.test.ts` passes in `npm test`. `curl /robots.txt`: `User-agent: *` group plus one named group with all 27 R1 tokens; both groups `Allow: /` and disallow `/dashboard /authorize /callback/ /token /register /mcp`; last line `Sitemap: http://localhost:8787/sitemap.xml`. | 2026-10-31 |
+| QA-002 | 1 | automated + manual | PASS | Tests pass. 10 sitemap `loc` entries, every one answers 200, canonical link equals its own loc, `lastmod` equals the visible "Last updated" (2026-10-31 for 8 pages, 2026-10-28 for privacy and terms); no `.md`, no private path. | 2026-10-31 |
+| QA-003 | 1 / 3 | automated + manual (external) | PASS (automated and local); external preview NOT RUN | Tests pass. `/faq` carries og:site_name EGX MCP, page title and description, absolute `og:image`, 1200x630, alt text, `twitter:card summary_large_image`. `/og-image.png` 200, 35,263 bytes, PNG 1200x630; viewed: EGX MCP logo, "EGX MCP", "Egyptian Exchange data for AI assistants", "Delayed data. Not investment advice." External WhatsApp, Slack or LinkedIn preview needs the deployed site. | 2026-10-31 |
+| QA-004 | 3 | manual (external) | NOT RUN | Post-release: needs the deployed site, Search Console and 30 days. | 2026-10-31 |
+| QA-005 | 1 | automated + manual | PASS | `/llms.txt`: `text/plain`, H1, blockquote sentence, audience paragraph with `<origin>/mcp`, Streamable HTTP, Google sign-in or API key, delayed, unofficial, information only, not investment advice, not affiliated; `Last updated: 2026-10-31`; `## Pages` links the 8 content pages' `.md`; `## Tools` lists 30 tools; `## Optional` holds privacy, terms (as `.md`), full file, server card, catalog; no personal name or email. Note: privacy and terms sit under Optional, not Pages, by design. | 2026-10-31 |
+| QA-006 | 1 | automated | PASS | `/llms-full.txt`: 8 bodies each with `Source:` and `Last updated:`; all 30 tool names present; 17 FAQ pairs; privacy and terms appear only as links. | 2026-10-31 |
+| QA-007 | 1 | automated + manual | PASS | `/connect/cursor.md` and `Accept: text/markdown` on `/connect/cursor` are byte-identical (`cmp`), `text/markdown`, numbered steps, JSON block, `Canonical:` and `Last updated:` lines. HTML response carries `Link: <...cursor.md>; rel="alternate"; type="text/markdown"` and the head `<link rel="alternate">`; `Accept: text/html` still gets HTML. | 2026-10-31 |
+| QA-008 | 1 | automated | PASS | `crawl.test.ts` `allows public paths and blocks private ones for %s` runs for `*` and every named token (explicit-group matcher); passes. | 2026-10-31 |
+| QA-009 | 1 | automated + manual | PASS | `/.well-known/ai-catalog.json`: specVersion plus one entry of type `application/mcp-server-card+json` with the card inline. `/mcp/server-card`: 200, `Content-Type: application/mcp-server-card+json`, `Access-Control-Allow-Origin: *`; name `io.github.ahmed-essawy/egx-mcp`; remote `streamable-http` at `/mcp` with optional secret `Authorization` header; `_meta` has oauth and apiKey details and 30 tools; 3 icons. `POST /mcp` answers 401. | 2026-10-31 |
+| QA-010 | 1 | automated | PASS | `site-drift` and `tool-descriptions` pass; `/tools` has 30 `<h3>`; llms.txt, llms-full.txt and the card list the same 30. | 2026-10-31 |
+| QA-011 | 1 | manual | PASS | All four guides (read through their `.md` twins and HTML): one-sentence answer, exactly 4 numbered steps with `<origin>/mcp` (Cursor puts it in the JSON block), sign-in or key method named, "If it does not work" list; Claude Code shows `claude mcp add --transport http egx <origin>/mcp`; Cursor shows the `mcpServers` JSON block. | 2026-10-31 |
+| QA-012 | 1 | manual + automated | PASS | `/faq` has 17 pairs covering every FR-S15 topic. Q3 "Is the data real-time?" says No, delayed about 15 minutes; Q4 says sources are unofficial; Q8 says no investment advice, never a buy, sell or hold recommendation; Q9 says not affiliated with the Egyptian Exchange. | 2026-10-31 |
+| QA-013 | 1 | automated | PASS | `site-content` passes. Manual grep of llms-full.txt for real-time, live, recommend: only negated statements found. | 2026-10-31 |
+| QA-014 | 1 | automated + manual validator | PASS (automated and offline); validator.schema.org NOT RUN | Home JSON-LD graph: Organization (name, url, logo, sameAs, contactPoint with url), WebSite, SoftwareApplication (name, description, url, image, offers price 0) and WebPage. `structured-data-testing-tool` 4.5.0 on flattened copies: all 4 types 100% passed. validator.schema.org is an external service; paste of the local page was not done. | 2026-10-31 |
+| QA-015 | 1 | automated | PASS | `structured-data.test.ts` passes; local pages carry FAQPage on `/faq` (17 items) and HowTo on `/connect/claude`. | 2026-10-31 |
+| QA-016 | 2 | automated + manual | PASS | `/data` and `/privacy`: nav trail Home then label with `aria-current="page"`; BreadcrumbList has the same two names and URLs; home has neither nav nor BreadcrumbList. | 2026-10-31 |
+| QA-017 | 1 | automated | PASS | `tests/integration/public-no-io.test.ts` passes; read: real `src/index.ts`, recording proxies for DB, DATA, OAUTH_KV, RATE_LIMITER, throwing `fetch`, GET and HEAD for every page, twin, text file, images, 304, 301, 404; asserts no `set-cookie`. | 2026-10-31 |
+| QA-018 | 1 | automated + manual | PASS | `/no-such-page`: 404 with `x-robots-tag: noindex, nofollow`, `cache-control: no-store`, robots meta in body. Sitemap and llms.txt hold no `dashboard`, `authorize` or `callback`; llms-full.txt mentions `/dashboard` only as text links for creating a key. `GET /dashboard` locally answers 302 to `/dashboard/login`, which answers 500 (no Google OAuth secrets locally) with `x-robots-tag: noindex, nofollow` and `no-store`. A signed-in dashboard cannot be reached locally; covered by the suite (dashboard tests pass). | 2026-10-31 |
+| QA-019 | 1 | automated + manual | PASS | `/tool`, `/connect`, `/faq/x`, `/no-such-page` each 404 with the "Page not found" h1 and noindex. | 2026-10-31 |
+| QA-020 | 1 | automated + manual | PASS | `/Tools/` 301 to `http://localhost:8787/tools`; `/FAQ` 301 to `/faq`; `/tools?utm_source=test` 200 with canonical `http://localhost:8787/tools`. | 2026-10-31 |
+| QA-021 | 1 | automated + manual | NOT RUN | Phase 7 pending owner approval of the Arabic copy. | 2026-10-31 |
+| QA-022 | 1 | automated | NOT RUN | Phase 7 pending owner approval of the Arabic copy. | 2026-10-31 |
+| QA-023 | 1 | automated + manual | NOT RUN | Phase 7 pending owner approval of the Arabic copy. | 2026-10-31 |
+| QA-024 | 2 | manual | NOT RUN | Phase 7 pending owner approval of the Arabic copy. | 2026-10-31 |
+| QA-025 | 1 | automated + manual | PASS | `listing.test.ts` passes. `docs/listing/server.json`: name, title, description 96 chars (limit 100), version, remote streamable-http, icon; descriptions.md holds name, sentence, registry, short and long descriptions, keywords and logo URLs with sizes; registries.md has 10 rows each with method, text and status `not submitted`. Nothing was submitted. | 2026-10-31 |
+| QA-026 | 1 | automated + manual | PASS | `npm run check:readme` passed. README paragraph 1 starts with the one-sentence description and links home, tools, the four guides, FAQ and data. | 2026-10-31 |
+| QA-027 | 1 | automated | PASS | `site-pages` and `site-html` pass in the full run. Spot check: 10 pages, unique titles and descriptions, canonical, preview tags, one h1 and footer nav on every page. | 2026-10-31 |
+| QA-028 | 1 | manual | PASS | Re-run today on `/`, `/connect/claude`, `/faq`: seo, a11y, best practices, performance all 1.00; LCP 0.8 s, CLS 0. The other 7 English pages rely on the earlier full run in `audit-results.md` (all categories at 1, home performance 0.99); the case allows this for pages unchanged since. 14 pages after Phase 7 not applicable yet. | 2026-10-31 |
+| QA-029 | 1 / 2 | automated + manual | PASS (offline and tests); external validators NOT RUN | All JSON-LD parses on `/`, `/tools`, `/connect/claude`, `/faq`, `/data`, `/privacy`; `structured-data-testing-tool` on flattened copies: every schema 100% passed, 0 failed. validator.schema.org and Rich Results Test on the deployed site need the deploy. | 2026-10-31 |
+| QA-030 | 2 | manual (external) | NOT RUN | Needs the deployed site (owner deploys). | 2026-10-31 |
+| QA-031 | 1 | automated | PASS | `npm test` passes (crawl, llms, drift suites); manual: all 10 `loc` return 200 and equal canonical; no private page in sitemap. | 2026-10-31 |
+| QA-032 | 1 | automated + manual | PASS | Tests pass. Page weight: HTML 6,579 to 15,734 bytes; css 2,831; logo-96 7,600; largest total 26,165 bytes, well under 102,400. | 2026-10-31 |
+| QA-033 | 1 | automated + manual | PASS | `/faq`: `cache-control: public, max-age=3600`, `etag`, `vary: Accept`; repeat with `If-None-Match` answers 304; `HEAD /llms.txt` 200 with headers and 0 body bytes; `/tools` has no `set-cookie` or `x-robots-tag`; private 404 `no-store`. | 2026-10-31 |
+| QA-034 | 2 | automated + manual mutation | PASS | Scratch copy, `search` description changed. `site-freshness` failed naming `/tools` ("bump updated in src/site/pages.ts and this pin together"). `site-drift`, `discovery`, `site-markdown` passed (catalog, summary files and card all show the new text). `tool-descriptions.test.ts` also failed because it pins the registered descriptions to the pre-feature text (the FR-S30 "descriptions unchanged" guard); expected by design, not a drift failure. Scratch removed, repo untouched. | 2026-10-31 |
+| QA-035 | 1 | automated + manual | PASS | Server with `PUBLIC_ORIGIN:https://egx.example.org`: `/`, sitemap, llms.txt, llms-full.txt, server card, robots, `/tools`, `faq.md`, ai-catalog all use `https://egx.example.org`; 0 occurrences of `workers.dev` or `localhost` in all of them. `docs/listing/server.json` keeps workers.dev by design. | 2026-10-31 |
+| QA-036 | 2 | automated + manual | PASS | Every checked page (`/`, tools, faq, cursor guide, data, privacy, terms) has exactly one `<script>`, the JSON-LD block (not executable); no `<style>`, no external font, script or tracker (only an anchor to GitHub); CSP `default-src 'self'`; Lighthouse best-practices 1.00 (no console errors). Content is server-rendered so it needs no JavaScript. | 2026-10-31 |
+| QA-037 | 3 | manual | PASS | The brand is `<header><a class="brand"><img logo-96.png alt="">EGX MCP</a>` text inside the page; `/og-image.png` is only referenced from meta tags (not rendered in the body), so blocking it cannot affect rendering. DevTools request blocking itself not driven. | 2026-10-31 |
+| QA-038 | 1 | automated + manual | PASS | Full `npm test` 2341 pass, including legal body byte-equality, unchanged tool descriptions pin and OAuth, dashboard and MCP contract tests. `POST /mcp` still 401 locally. Local Google sign-in not possible (no OAuth secrets); `GET /dashboard/login` 500 locally is the same as the earlier audit and unrelated to this feature. | 2026-10-31 |
+| QA-039 | 1 | automated + manual | PASS | Case-sensitive grep for `Essawy`, `gmail` and email patterns over added lines of the diff and over untracked non-spec files: no match. Matches only for the lowercase GitHub handle `ahmed-essawy` and the `essawy.workers.dev` host (registry name, repository and site address, needed by design). | 2026-10-31 |
+| QA-040 | 3 | manual (external) | NOT RUN | Post-release benchmark in third-party assistants; needs the deployed site and accounts. | 2026-10-31 |
+| QA-041 | 3 | manual (external) | NOT RUN | Post-release Search Console tracking over 3 months. | 2026-10-31 |
+| QA-042 | 3 | manual (external) | NOT RUN | Post-release: needs owner-approved registry submissions to be live. | 2026-10-31 |
+| QA-043 | 2 | automated + manual (external) | PASS (key file and no cron); IndexNow POST NOT RUN | Key file `/c60c57998197b5e5b4a9fc2f935a3c44.txt` returns the key; `git diff main -- wrangler.jsonc` is empty, so `triggers` is unchanged. The IndexNow POST is an outward submission and was not made (owner, after deploy). | 2026-10-31 |
+
+## NOT RUN grouped by reason
+
+- Phase 7 pending owner approval of the Arabic copy: QA-021, QA-022, QA-023, QA-024.
+- Post-release tracking, deployed site or third party: QA-004 (SC-009), QA-040 (SC-010, SC-011), QA-041 (SC-011), QA-042 (SC-012), QA-030 (deployed headers and Lighthouse).
+- External parts inside cases that are otherwise PASS: QA-003 (WhatsApp, Slack or LinkedIn preview), QA-014 and QA-029 (validator.schema.org, Rich Results Test), QA-043 (IndexNow POST).

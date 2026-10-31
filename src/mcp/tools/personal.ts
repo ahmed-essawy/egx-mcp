@@ -4,7 +4,7 @@ import type { AuthProps } from "../../auth/api-keys";
 import { SECONDS_PER_DAY, toCairoIso } from "../../domain/calendar";
 import { evaluateLevels, type CrossedLevel, type PriceLevelRow } from "../../domain/levels";
 import { CAPACITY_MESSAGE, capacityRetryAt, checkPersonalWrite } from "../../limits/usage";
-import { DEFAULT_EVENTS_LIMIT, listEventsSince, type EventKind, type MarketEvent } from "../../store/d1/events";
+import { DEFAULT_EVENTS_LIMIT, listEventsSince, MAX_SINCE_AGE_DAYS, type EventKind, type MarketEvent } from "../../store/d1/events";
 import {
   CROSSING_WORST_ROWS,
   INSERT_WORST_ROWS,
@@ -38,7 +38,6 @@ import {
   staleReasonOf,
 } from "../shared";
 
-const MAX_SINCE_AGE_DAYS = 30;
 const MILLIS_PER_SECOND = 1000;
 const PERCENT = 100;
 const UNCLASSIFIED_SECTOR = "Unclassified";
@@ -508,7 +507,6 @@ export function registerPersonalTools(server: McpServer, env: Env, auth: AuthPro
     server,
     {
       name: "portfolio_get",
-      description: "Get your portfolio with value, gain, sector allocation and price levels crossed since the last check.",
       inputSchema: emptyInputSchema,
       outputSchema: portfolioOutputSchema,
       readOnly: true,
@@ -521,7 +519,6 @@ export function registerPersonalTools(server: McpServer, env: Env, auth: AuthPro
     server,
     {
       name: "portfolio_upsert_holding",
-      description: `Add a holding, or update one by id. Up to ${MAX_ITEMS_PER_USER} holdings per user.`,
       inputSchema: holdingInputSchema,
       outputSchema: idOutputSchema,
       readOnly: false,
@@ -534,7 +531,6 @@ export function registerPersonalTools(server: McpServer, env: Env, auth: AuthPro
     server,
     {
       name: "portfolio_remove_holding",
-      description: "Remove one of your holdings by id.",
       inputSchema: removeInputSchema,
       outputSchema: removedOutputSchema,
       readOnly: false,
@@ -547,7 +543,6 @@ export function registerPersonalTools(server: McpServer, env: Env, auth: AuthPro
     server,
     {
       name: "price_level_set",
-      description: `Set a price level for a symbol, or update one by id. Up to ${MAX_ITEMS_PER_USER} levels per user.`,
       inputSchema: levelInputSchema,
       outputSchema: idOutputSchema,
       readOnly: false,
@@ -560,7 +555,6 @@ export function registerPersonalTools(server: McpServer, env: Env, auth: AuthPro
     server,
     {
       name: "price_level_remove",
-      description: "Remove one of your price levels by id.",
       inputSchema: removeInputSchema,
       outputSchema: removedOutputSchema,
       readOnly: false,
@@ -573,7 +567,6 @@ export function registerPersonalTools(server: McpServer, env: Env, auth: AuthPro
     server,
     {
       name: "price_levels_list",
-      description: "List your price levels with their armed state and last crossing time.",
       inputSchema: emptyInputSchema,
       outputSchema: levelsListOutputSchema,
       readOnly: true,
@@ -586,7 +579,6 @@ export function registerPersonalTools(server: McpServer, env: Env, auth: AuthPro
     server,
     {
       name: "what_changed_since",
-      description: `List new fund NAVs, big moves, new listings, corporate actions and your crossed price levels since an instant within the last ${MAX_SINCE_AGE_DAYS} days.`,
       inputSchema: sinceInputSchema,
       outputSchema: changesOutputSchema,
       readOnly: true,

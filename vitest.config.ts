@@ -16,6 +16,8 @@ const NODE_TEST_FILES = [
   "tests/unit/oauth-guard.test.ts",
   "tests/unit/sign-in.test.ts",
   "tests/unit/server.test.ts",
+  "tests/unit/site-drift.test.ts",
+  "tests/unit/tool-descriptions.test.ts",
   "tests/unit/tool-provenance.test.ts",
 ];
 

@@ -1,4 +1,7 @@
 export const STATUS_OK = 200;
+export const STATUS_NO_CONTENT = 204;
+export const STATUS_MOVED_PERMANENTLY = 301;
+export const STATUS_NOT_MODIFIED = 304;
 export const STATUS_FOUND = 302;
 export const STATUS_SEE_OTHER = 303;
 export const STATUS_BAD_REQUEST = 400;

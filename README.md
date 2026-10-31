@@ -1,5 +1,7 @@
 # EGX MCP Server
 
+EGX MCP is a free MCP server that lets AI assistants answer questions about Egyptian Exchange stocks, indices and funds with delayed data. Visit the [home page](https://egx-mcp.essawy.workers.dev/), the [tool catalog](https://egx-mcp.essawy.workers.dev/tools), the guides for [Claude](https://egx-mcp.essawy.workers.dev/connect/claude), [ChatGPT](https://egx-mcp.essawy.workers.dev/connect/chatgpt), [Claude Code](https://egx-mcp.essawy.workers.dev/connect/claude-code) and [Cursor](https://egx-mcp.essawy.workers.dev/connect/cursor), the [questions and answers](https://egx-mcp.essawy.workers.dev/faq) and the [data sources and limits](https://egx-mcp.essawy.workers.dev/data).
+
 An MCP (Model Context Protocol) server that gives AI assistants read access to Egyptian Exchange (EGX) market data: stock quotes, indices, gold, silver and the dollar rate today, with price history, index history, funds, dividends and financial figures. It runs as one Cloudflare Worker on the free tier. Anyone with a Google account can sign in, create an API key and use it from Claude (custom connector), Claude Code, ChatGPT or Cursor.
 
 Status: the MVP runs at <https://egx-mcp.essawy.workers.dev/> (see also the [privacy policy](https://egx-mcp.essawy.workers.dev/privacy) and the [terms of use](https://egx-mcp.essawy.workers.dev/terms)), and no permission from EGX or EGID to share the data has been obtained yet. See [Data sources and limits](#data-sources-and-limits).

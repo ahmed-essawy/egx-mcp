@@ -1,14 +1,10 @@
 import { describe, expect, it } from "vitest";
-import {
-  CONTACT_EMAIL,
-  GOVERNING_LAW_TEXT,
-  LEGAL_LAST_UPDATED,
-  OPERATOR_NAME,
-  privacyView,
-  termsView,
-} from "../../src/http/legal";
+import { CONTACT_EMAIL, GOVERNING_LAW_TEXT, LEGAL_LAST_UPDATED, OPERATOR_NAME } from "../../src/http/legal";
 import { DATA_SOURCES } from "../../src/http/views";
+import { pageByPath } from "../../src/site/pages";
+import { renderPageHtml } from "../../src/site/render-html";
 import { FOOTER_NAV } from "../helpers/html";
+import { TEST_CONTEXT } from "../helpers/site";
 
 const LAST_UPDATED_DATE = "2026-10-28";
 const OPERATOR = "Ahmed M. Essawy";
@@ -17,7 +13,7 @@ const MAILTO_LINK = `href="mailto:${CONTACT}"`;
 const H2_PATTERN = /<h2[^>]*>([^<]+)<\/h2>/g;
 const SECTION_PATTERN = /<section\b[^>]*>/g;
 const ARIA_LABELLEDBY_PATTERN = /aria-labelledby="([^"]+)"/;
-const FORBIDDEN_MARKUP = ["<script", "<style", "style=", "<form"];
+const FORBIDDEN_MARKUP = ["<style", "style=", "<form"];
 
 const PRIVACY_HEADINGS = [
   "Who runs this service",
@@ -79,6 +75,12 @@ const TERMS_FACTS = [
   'href="/privacy"',
 ];
 
+function renderLegal(path: string): string {
+  const page = pageByPath(path);
+  if (page === undefined) throw new Error(`missing page ${path}`);
+  return renderPageHtml(page, TEST_CONTEXT);
+}
+
 function headingsOf(html: string): string[] {
   return Array.from(html.matchAll(H2_PATTERN), (match) => match[1] ?? "");
 }
@@ -91,6 +93,7 @@ function expectBasePageRules(html: string): void {
   for (const markup of FORBIDDEN_MARKUP) {
     expect(html).not.toContain(markup);
   }
+  expect(html.match(/<script/g)).toHaveLength(1);
   expect(html).toContain(FOOTER_NAV);
   expect(html).toContain(`Last updated: ${LAST_UPDATED_DATE}`);
   const labels = sectionLabelsOf(html);
@@ -110,7 +113,7 @@ describe("legal constants", () => {
 });
 
 describe("privacyView", () => {
-  const html = privacyView();
+  const html = renderLegal("/privacy");
 
   it("renders the title heading", () => {
     expect(html).toContain("<h1>Privacy policy</h1>");
@@ -130,7 +133,7 @@ describe("privacyView", () => {
 });
 
 describe("privacyView account deletion", () => {
-  const html = privacyView();
+  const html = renderLegal("/privacy");
 
   it("no longer defers deletion to a future button", () => {
     expect(html).not.toContain("until a delete button is available");
@@ -138,7 +141,7 @@ describe("privacyView account deletion", () => {
 });
 
 describe("termsView", () => {
-  const html = termsView();
+  const html = renderLegal("/terms");
 
   it("renders the title heading", () => {
     expect(html).toContain("<h1>Terms of use</h1>");

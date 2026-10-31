@@ -1,5 +1,5 @@
 import { CAPACITY_MESSAGE } from "../limits/usage";
-import { STATUS_SERVICE_UNAVAILABLE } from "./status";
+import { STATUS_INTERNAL_ERROR, STATUS_SERVICE_UNAVAILABLE } from "./status";
 import { htmlResponse, messageView, withCookies } from "./views";
 
 export function messageResponse(title: string, text: string, status: number, cookies: string[] = []): Response {
@@ -12,4 +12,8 @@ export function redirect(location: string, status: number, cookies: string[] = [
 
 export function capacityResponse(cookies: string[] = []): Response {
   return messageResponse("Service at capacity", CAPACITY_MESSAGE, STATUS_SERVICE_UNAVAILABLE, cookies);
+}
+
+export function internalErrorResponse(): Response {
+  return messageResponse("Something went wrong", "The request could not be completed.", STATUS_INTERNAL_ERROR);
 }

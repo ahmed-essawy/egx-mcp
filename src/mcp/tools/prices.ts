@@ -184,7 +184,6 @@ function registerMetals(server: McpServer, env: Env, auth: AuthProps): void {
     server,
     {
       name: "get_metals",
-      description: "Get delayed Egyptian gold and silver prices per gram and global gold and silver spot prices in USD.",
       inputSchema: emptyInputSchema,
       outputSchema: metalsOutputSchema,
       readOnly: true,
@@ -205,7 +204,6 @@ function registerUsdEgp(server: McpServer, env: Env, auth: AuthProps): void {
     server,
     {
       name: "get_usd_egp",
-      description: "Get the delayed USD to EGP market exchange rate.",
       inputSchema: emptyInputSchema,
       outputSchema: fxOutputSchema,
       readOnly: true,

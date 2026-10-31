@@ -78,3 +78,9 @@ Owner answers to the planner questions (Q1 to Q4 in plan.md) use the recommended
 ## Amendment 2 (2026-10-28): account deletion button and OAuth records
 
 FR-L03 section 9 now describes the dashboard "Delete account" button (T110) instead of deletion by email, with email kept as a fallback, and the "How long we keep data" section names the OAuth grant and token records kept in Cloudflare KV, the 24 hour access token lifetime and the revocation and removal of the grant and its tokens on account deletion (T130).
+
+## Amendment (spec 006, 2026-10-31): public header set and search metadata
+
+FR-L01 is amended by spec 006 (search and AI discoverability). `GET /privacy` and `GET /terms` now answer with the public header set instead of `no-store`: `cache-control: public, max-age=3600`, `etag` (with `304` on a matching `If-None-Match`), `vary: Accept` and a `link` header pointing at the Markdown twin. The CSP, `x-content-type-options` and `referrer-policy` values and the absence of `set-cookie` are unchanged. `HEAD` is answered like `GET`.
+
+The pages gain a meta description, a canonical link, social tags, a breadcrumb and JSON-LD, and appear in `/sitemap.xml`. The titles become "Privacy policy: EGX MCP" and "Terms of use: EGX MCP". Body text, sections and dates are unchanged.

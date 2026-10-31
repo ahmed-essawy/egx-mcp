@@ -277,7 +277,6 @@ function registerOverview(server: McpServer, env: Env, auth: AuthProps): void {
     server,
     {
       name: "get_market_overview",
-      description: "Get the delayed EGX market overview: indices, breadth, top movers, most active stocks and totals.",
       inputSchema: overviewInputSchema,
       outputSchema: overviewOutputSchema,
       readOnly: true,
@@ -313,7 +312,6 @@ function registerIndices(server: McpServer, env: Env, auth: AuthProps): void {
     server,
     {
       name: "get_indices",
-      description: "Get delayed EGX index values by name or code. An empty list returns every known index.",
       inputSchema: indicesInputSchema,
       outputSchema: indicesOutputSchema,
       readOnly: true,
@@ -340,7 +338,6 @@ function registerDailySummary(server: McpServer, env: Env, auth: AuthProps): voi
     server,
     {
       name: "get_daily_summary",
-      description: "Get the summary of the last completed session: indices, breadth, top movers and totals.",
       inputSchema: summaryInputSchema,
       outputSchema: summaryOutputSchema,
       readOnly: true,
@@ -581,8 +578,6 @@ function registerMovers(server: McpServer, env: Env, auth: AuthProps): void {
     server,
     {
       name: "get_movers",
-      description:
-        "List delayed EGX movers: gainers, losers, volume, value, unusual volume, or stocks near their 52-week high or low.",
       inputSchema: moversInputSchema,
       outputSchema: moversOutputSchema,
       readOnly: true,
@@ -646,7 +641,6 @@ function registerRange(server: McpServer, env: Env, auth: AuthProps): void {
     server,
     {
       name: "get_52_week_range",
-      description: "Get the 52-week high and low of up to 20 Egyptian stocks and the distance of the delayed price from each.",
       inputSchema: rangeInputSchema,
       outputSchema: rangeOutputSchema,
       readOnly: true,
@@ -721,7 +715,6 @@ function registerSectorPerformance(server: McpServer, env: Env, auth: AuthProps)
     server,
     {
       name: "get_sector_performance",
-      description: "Get the median return, advancers and decliners of each EGX sector over a period.",
       inputSchema: sectorInputSchema,
       outputSchema: sectorOutputSchema,
       readOnly: true,

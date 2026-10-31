@@ -3,6 +3,7 @@ import { z } from "zod";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { AuthProps } from "../../src/auth/api-keys";
 import { NOTICE } from "../../src/mcp/envelope";
+import { TOOL_DESCRIPTIONS } from "../../src/mcp/tool-descriptions";
 import { createServer, defineTool, type ToolContext } from "../../src/mcp/server";
 
 const mocks = vi.hoisted(() => ({
@@ -52,7 +53,6 @@ function define(
     server,
     {
       name: "search",
-      description: "Search symbols.",
       inputSchema: z.object({ symbol: z.string() }),
       outputSchema: z.object({}),
       readOnly: options.readOnly ?? true,
@@ -81,7 +81,7 @@ describe("defineTool", () => {
     const { server, registered } = stubServer();
     define(server, async () => TOOL_RESULT);
     expect(registered[0]?.name).toBe("search");
-    expect(registered[0]?.config.description).toBe(`Search symbols. ${NOTICE}`);
+    expect(registered[0]?.config.description).toBe(`${TOOL_DESCRIPTIONS.search} ${NOTICE}`);
     expect(registered[0]?.config.annotations).toEqual({ readOnlyHint: true });
   });
 

@@ -4,17 +4,15 @@ import {
   type ConsentInput,
   dashboardView,
   escapeHtml,
-  HOME_PATH,
-  landingView,
+  HTML_HEADERS,
   MCP_PATH,
   mcpUrl,
   page,
-  PRIVACY_PATH,
   STYLESHEET,
-  TERMS_PATH,
   type DashboardInput,
 } from "../../src/http/views";
-import { AFFILIATION, FOOTER_NAV, ICON_LINKS, SITE_HEADER } from "../helpers/html";
+import { HOME_PATH, PRIVACY_PATH, TERMS_PATH } from "../../src/site/paths";
+import { FOOTER_NAV, ICON_LINKS, SITE_HEADER } from "../helpers/html";
 
 const SCRIPT_PAYLOAD = "<script>alert(1)</script>";
 const ESCAPED_SCRIPT_OPEN = "&lt;script&gt;";
@@ -31,31 +29,9 @@ const NEW_KEY = "egx_new-key-value";
 const FORM_CONTROL_PATTERN = /<(input|select|textarea)\b[^>]*>/gi;
 const HIDDEN_INPUT_PATTERN = /type="hidden"/i;
 const ID_ATTRIBUTE_PATTERN = /\bid="([^"]+)"/i;
-const SIGN_IN_AGREEMENT = "By signing in you agree to the";
 const AUTHORIZE_AGREEMENT = "By authorizing you agree to the";
 const AGREEMENT_PARAGRAPH_PATTERN = /<p class="agreement">By [^<]*you agree to the[\s\S]*?<\/p>/;
 
-const MCP_URL = "https://egx.example.com/mcp";
-const HOSTILE_URL = 'https://x.test/"><script>';
-const VALUE_LINE = "Ask your AI assistant about Egyptian Exchange stocks and indices. Data is delayed.";
-const BEARER_HEADER = "Authorization: Bearer &lt;your key&gt;";
-const CONNECT_NOTE =
-  "Claude, ChatGPT and Cursor connect with Google sign-in or with an API key header. Create your key after signing in.";
-const NOTICE =
-  "Data is delayed, unofficial and for information only, not financial advice. Sources: EGX website, TradingView, Mubasher Info, iSagha.";
-const GITHUB_LINK = '<a href="https://github.com/ahmed-essawy/egx-mcp">GitHub</a>';
-const REMOVED_TEXT = [
-  "What you can ask",
-  "Connect in 3 steps",
-  "What is covered",
-  "Data sources",
-  "Read the docs",
-  "cannot send a header",
-  "<ol",
-  "<h3",
-];
-const H2_PATTERN = /<h2[^>]*>([^<]+)<\/h2>/g;
-const ARIA_LABELLEDBY_PATTERN = /aria-labelledby="([^"]+)"/g;
 const HEX_DECLARATION_PATTERN = /([\w-]+):[^;{}]*#[0-9a-f]{3,8}\b/gi;
 
 function dashboardInput(overrides: Partial<DashboardInput> = {}): DashboardInput {
@@ -264,86 +240,6 @@ describe("consentView", () => {
   });
 });
 
-describe("landingView", () => {
-  const html = landingView(MCP_URL);
-
-  it("has exactly one h1 with the product name", () => {
-    expect(html.match(/<h1\b/g)).toHaveLength(1);
-    expect(html).toContain('<h1 id="hero-title">EGX MCP</h1>');
-  });
-
-  it("states the value line and offers one sign in button", () => {
-    expect(html).toContain(VALUE_LINE);
-    expect(html).toContain('<a class="button" href="/dashboard">Sign in</a>');
-    expect(html.match(/class="button"/g)).toHaveLength(1);
-  });
-
-  it("shows the agreement notice with both policy links after the dashboard link", () => {
-    const notice = AGREEMENT_PARAGRAPH_PATTERN.exec(html)?.[0] ?? "";
-
-    expect(notice).toContain(SIGN_IN_AGREEMENT);
-    expect(notice).toContain('href="/terms"');
-    expect(notice).toContain('href="/privacy"');
-    expect(html.indexOf(SIGN_IN_AGREEMENT)).toBeGreaterThan(html.indexOf('href="/dashboard"'));
-  });
-
-  it("has only the connection heading", () => {
-    expect([...html.matchAll(H2_PATTERN)].map((match) => match[1])).toEqual(["Connect your assistant"]);
-  });
-
-  it("points every aria-labelledby at a heading id", () => {
-    const labelledBy = [...html.matchAll(ARIA_LABELLEDBY_PATTERN)].map((match) => match[1]);
-
-    expect(labelledBy.length).toBeGreaterThan(0);
-    for (const id of labelledBy) {
-      expect(html, id).toMatch(new RegExp(`<h[12] id="${id}"`));
-    }
-  });
-
-  it("shows the server url and the bearer header in their own boxes with the connect note", () => {
-    expect(html).toContain(`<code>${MCP_URL}</code>`);
-    expect(html).toContain(`<code>${BEARER_HEADER}</code>`);
-    expect(html).toContain(CONNECT_NOTE);
-    expect(html.indexOf(BEARER_HEADER)).toBeGreaterThan(html.indexOf(MCP_URL));
-  });
-
-  it("escapes the server url", () => {
-    const output = landingView(HOSTILE_URL);
-
-    expect(output).not.toContain(SCRIPT_OPEN_TAG);
-    expect(output).toContain("&quot;&gt;&lt;script&gt;");
-  });
-
-  it("shows the independence and data notice with the sources", () => {
-    expect(html).toContain(NOTICE);
-  });
-
-  it("states the affiliation once", () => {
-    expect(html.split(AFFILIATION)).toHaveLength(2);
-  });
-
-  it("links the privacy policy, terms and GitHub in the footer", () => {
-    expect(html).toContain(FOOTER_NAV);
-    expect(html).toContain(GITHUB_LINK);
-  });
-
-  it("drops the removed sections and the false connector claim", () => {
-    for (const text of REMOVED_TEXT) {
-      expect(html).not.toContain(text);
-    }
-    expect(html).not.toMatch(/cannot (send|take)/i);
-  });
-
-  it("has no script, style element or inline style and only the GitHub external link", () => {
-    expect(html).not.toContain(SCRIPT_OPEN_TAG);
-    expect(html).not.toContain("<style");
-    expect(html).not.toContain("style=");
-    expect([...html.matchAll(/href="(http[^"]+)"/g)].map((match) => match[1])).toEqual([
-      "https://github.com/ahmed-essawy/egx-mcp",
-    ]);
-  });
-});
-
 describe("path constants", () => {
   it("names the home, privacy and terms paths", () => {
     expect(HOME_PATH).toBe("/");
@@ -391,8 +287,26 @@ describe("STYLESHEET", () => {
   });
 });
 
+describe("HTML_HEADERS", () => {
+  it("keeps private pages out of search results", () => {
+    expect(HTML_HEADERS["x-robots-tag"]).toBe("noindex, nofollow");
+    expect(HTML_HEADERS["cache-control"]).toBe("no-store");
+  });
+});
+
 describe("page", () => {
   const html = page("Title", "<p>body</p>");
+
+  it("asks search engines not to index the page, right after the viewport", () => {
+    const viewport = html.indexOf('<meta name="viewport"');
+    const robots = html.indexOf('<meta name="robots" content="noindex, nofollow">');
+    expect(robots).toBeGreaterThan(viewport);
+    expect(html.indexOf("<title>")).toBeGreaterThan(robots);
+  });
+
+  it("declares left-to-right direction", () => {
+    expect(html).toContain('<html lang="en" dir="ltr">');
+  });
 
   it("declares the English language", () => {
     expect(html).toContain('<html lang="en"');

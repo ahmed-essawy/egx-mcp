@@ -5,6 +5,7 @@ import { checkLimits, finishCall, RowsCounter } from "../limits/usage";
 import { nowSeconds } from "../domain/calendar";
 import type { UsageSnapshot } from "../store/d1/usage";
 import { fail, NOTICE, type Label } from "./envelope";
+import { TOOL_DESCRIPTIONS } from "./tool-descriptions";
 import type { ToolName } from "./tool-names";
 
 const INTERNAL_ERROR_MESSAGE = "Temporarily unavailable.";
@@ -29,7 +30,6 @@ export type ToolContext = {
 
 export type ToolDefinition<I extends StandardSchemaWithJSON, O extends StandardSchemaWithJSON> = {
   name: ToolName;
-  description: string;
   inputSchema: I;
   outputSchema: O;
   readOnly: boolean;
@@ -95,7 +95,7 @@ export function defineTool<I extends StandardSchemaWithJSON, O extends StandardS
   server.registerTool<O, I>(
     tool.name,
     {
-      description: `${tool.description} ${NOTICE}`,
+      description: `${TOOL_DESCRIPTIONS[tool.name]} ${NOTICE}`,
       inputSchema: reportInvalidInput(tool.inputSchema),
       outputSchema: tool.outputSchema,
       annotations: { readOnlyHint: tool.readOnly },

@@ -133,7 +133,6 @@ export function registerQuoteTools(server: McpServer, env: Env, auth: AuthProps)
     server,
     {
       name: "get_quotes",
-      description: "Get delayed quotes for up to 20 Egyptian stocks by ticker, ISIN, or Arabic or English name.",
       inputSchema,
       outputSchema,
       readOnly: true,

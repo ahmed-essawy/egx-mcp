@@ -343,8 +343,6 @@ function registerGetFund(server: McpServer, env: Env, auth: AuthProps): void {
     server,
     {
       name: "get_fund",
-      description:
-        "Get an Egyptian mutual fund by id or Arabic or English name: latest NAV with its date, and performance over 1 month, 3 months, 1 year and year to date.",
       inputSchema: z.object({ fund: symbolInputSchema }),
       outputSchema: fundOutputSchema,
       readOnly: true,
@@ -393,8 +391,6 @@ function registerGetFundHistory(server: McpServer, env: Env, auth: AuthProps): v
     server,
     {
       name: "get_fund_history",
-      description:
-        "Get the stored NAV history of an Egyptian mutual fund between two dates, 500 points per page, with the earliest date available.",
       inputSchema: historyInputSchema,
       outputSchema: historyOutputSchema,
       readOnly: true,
@@ -445,8 +441,6 @@ function registerCompareFunds(server: McpServer, env: Env, auth: AuthProps): voi
     server,
     {
       name: "compare_funds",
-      description:
-        "Compare 2 to 5 Egyptian mutual funds over 1 month, 3 months, 1 year or year to date, each in its own currency, optionally against EGX30.",
       inputSchema: compareInputSchema,
       outputSchema: compareOutputSchema,
       readOnly: true,
@@ -497,8 +491,6 @@ function registerGetRealReturn(server: McpServer, env: Env, auth: AuthProps): vo
     server,
     {
       name: "get_real_return",
-      description:
-        "Get the nominal, inflation and real return of one Egyptian mutual fund or one stock between two dates, using stored CPI figures.",
       inputSchema: realReturnInputSchema,
       outputSchema: realReturnOutputSchema,
       readOnly: true,

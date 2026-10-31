@@ -1,0 +1,36 @@
+import { MAX_ITEMS_PER_USER } from "../store/d1/personal";
+import { MAX_SINCE_AGE_DAYS } from "../store/d1/events";
+import type { ToolName } from "./tool-names";
+
+export const TOOL_DESCRIPTIONS: Readonly<Record<ToolName, string>> = {
+  search: "Find Egyptian stocks and mutual funds by ticker, ISIN, or Arabic or English name.",
+  get_quotes: "Get delayed quotes for up to 20 Egyptian stocks by ticker, ISIN, or Arabic or English name.",
+  get_market_overview: "Get the delayed EGX market overview: indices, breadth, top movers, most active stocks and totals.",
+  get_indices: "Get delayed EGX index values by name or code. An empty list returns every known index.",
+  get_index_history: "Get stored end-of-day closes of one EGX index (EGX30, EGX30CAPPED, EGX70EWI, EGX100EWI, EGX30USD) for up to 5 years, daily, weekly or monthly, at most 500 points.",
+  get_index_summary: "Summarize up to 5 EGX indices from stored end-of-day closes: latest close, daily change, period high, low and return, 20 and 50 session averages, annualized volatility, drawdown from the period high and 5 session return, with the index of highest period return.",
+  get_price_history: "Get end-of-day price history (raw, adjusted or both) for one Egyptian stock over a range of at most 5 years, 500 bars per page.",
+  compare_symbols: "Compare 2 to 5 Egyptian stocks over a range of at most 5 years: return, high, low and total volume from adjusted end-of-day prices.",
+  get_movers: "List delayed EGX movers: gainers, losers, volume, value, unusual volume, or stocks near their 52-week high or low.",
+  get_52_week_range: "Get the 52-week high and low of up to 20 Egyptian stocks and the distance of the delayed price from each.",
+  get_sector_performance: "Get the median return, advancers and decliners of each EGX sector over a period.",
+  get_daily_summary: "Get the summary of the last completed session: indices, breadth, top movers and totals.",
+  get_fund: "Get an Egyptian mutual fund by id or Arabic or English name: latest NAV with its date, and performance over 1 month, 3 months, 1 year and year to date.",
+  get_fund_history: "Get the stored NAV history of an Egyptian mutual fund between two dates, 500 points per page, with the earliest date available.",
+  compare_funds: "Compare 2 to 5 Egyptian mutual funds over 1 month, 3 months, 1 year or year to date, each in its own currency, optionally against EGX30.",
+  get_real_return: "Get the nominal, inflation and real return of one Egyptian mutual fund or one stock between two dates, using stored CPI figures.",
+  get_company_profile: "Get the profile of an Egyptian listed company by ticker, ISIN, or Arabic or English name: sector, market, shares outstanding, free float and first trade date.",
+  get_dividends: "Get cash dividends by ex-dividend date for one Egyptian stock, or for every company when no symbol is given. The default range is today through the next 90 days.",
+  get_corporate_actions: "Get every corporate action of one Egyptian stock (dividends, bonus shares, splits, rights and others) with its ex-date, optionally from a given date.",
+  get_financials: "Get the stored financial figures of one Egyptian stock with P/E, P/B and dividend yield computed from the current price, each showing its inputs or why it cannot be computed.",
+  get_metals: "Get delayed Egyptian gold and silver prices per gram and global gold and silver spot prices in USD.",
+  get_usd_egp: "Get the delayed USD to EGP market exchange rate.",
+  portfolio_get: "Get your portfolio with value, gain, sector allocation and price levels crossed since the last check.",
+  portfolio_upsert_holding: `Add a holding, or update one by id. Up to ${MAX_ITEMS_PER_USER} holdings per user.`,
+  portfolio_remove_holding: "Remove one of your holdings by id.",
+  price_level_set: `Set a price level for a symbol, or update one by id. Up to ${MAX_ITEMS_PER_USER} levels per user.`,
+  price_level_remove: "Remove one of your price levels by id.",
+  price_levels_list: "List your price levels with their armed state and last crossing time.",
+  what_changed_since: `List new fund NAVs, big moves, new listings, corporate actions and your crossed price levels since an instant within the last ${MAX_SINCE_AGE_DAYS} days.`,
+  admin: "Owner only. Manage notices, the holiday and special hours table, inflation figures, corporate actions and bonus, split and reverse split ratios, usage and pending symbols. activate_symbol does not rewrite the symbol directory; the next end-of-day run does.",
+};

@@ -1,0 +1,26 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "io.github.ahmed-essawy/egx-mcp",
+  "title": "EGX MCP",
+  "description": "Delayed Egyptian Exchange (EGX) stocks, indices, funds, gold and USD/EGP data for AI assistants.",
+  "version": "1.0.0",
+  "websiteUrl": "https://egx-mcp.essawy.workers.dev/",
+  "repository": { "url": "https://github.com/ahmed-essawy/egx-mcp", "source": "github" },
+  "icons": [
+    { "src": "https://egx-mcp.essawy.workers.dev/icon-512.png", "mimeType": "image/png", "sizes": ["512x512"] }
+  ],
+  "remotes": [
+    {
+      "type": "streamable-http",
+      "url": "https://egx-mcp.essawy.workers.dev/mcp",
+      "headers": [
+        {
+          "name": "Authorization",
+          "description": "Optional. Bearer API key from https://egx-mcp.essawy.workers.dev/dashboard, sent as Bearer <your key>. Leave it out to sign in with Google through OAuth.",
+          "isRequired": false,
+          "isSecret": true
+        }
+      ]
+    }
+  ]
+}

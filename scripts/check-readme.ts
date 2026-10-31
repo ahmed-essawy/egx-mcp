@@ -1,4 +1,5 @@
 import { TOOL_NAMES } from "../src/mcp/tool-names.ts";
+import { SITE } from "../src/site/identity.ts";
 
 interface NodeFs {
   readFileSync(path: string, encoding: "utf8"): string;
@@ -38,6 +39,19 @@ const REQUIRED_TEXTS = [
   "iSagha",
 ];
 
+const REQUIRED_PAGE_PATHS = [
+  "/",
+  "/tools",
+  "/connect/claude",
+  "/connect/chatgpt",
+  "/connect/claude-code",
+  "/connect/cursor",
+  "/faq",
+  "/data",
+];
+
+const MARKDOWN_LINK_PATTERN = /\]\(https?:\/\/[^/)\s]+(\/[^)\s]*)\)/g;
+
 const HEADING_PATTERN = /^(#{1,6})\s+(.+?)\s*#*\s*$/;
 
 const FENCE_MARKER = "```";
@@ -73,6 +87,27 @@ function sectionLines(lines: string[], headings: Heading[], title: string): stri
   return lines.slice(start.line + 1, end?.line);
 }
 
+function firstParagraphAfterTitle(lines: string[], headings: Heading[]): string {
+  const title = headings.find((heading) => heading.level === 1);
+  if (!title) return "";
+  const body = lines.slice(title.line + 1);
+  const start = body.findIndex((line) => line.trim() !== "");
+  if (start === -1) return "";
+  const rest = body.slice(start);
+  const end = rest.findIndex((line) => line.trim() === "");
+  return rest.slice(0, end === -1 ? undefined : end).join(" ");
+}
+
+function introProblems(paragraph: string): string[] {
+  const linkedPaths = new Set([...paragraph.matchAll(MARKDOWN_LINK_PATTERN)].map((match) => match[1]));
+  return [
+    ...(paragraph.startsWith(SITE.oneLine) ? [] : ["first paragraph does not start with the site one-sentence description"]),
+    ...REQUIRED_PAGE_PATHS.filter((path) => !linkedPaths.has(path)).map(
+      (path) => `first paragraph does not link the site page: ${path}`,
+    ),
+  ];
+}
+
 function mentionsWithQuestion(lines: string[], name: string): boolean {
   const namePattern = new RegExp(`(?<![A-Za-z0-9_])${name}(?![A-Za-z0-9_])`);
   return lines.some((line) => namePattern.test(line) && line.includes("?"));
@@ -86,6 +121,7 @@ function findProblems(readme: string, toolNames: readonly string[]): string[] {
   const toolsSection = sectionLines(lines, headings, TOOLS_HEADING);
 
   return [
+    ...introProblems(firstParagraphAfterTitle(lines, headings)),
     ...REQUIRED_HEADINGS.filter((title) => !titles.has(title)).map((title) => `missing heading: ${title}`),
     ...toolNames
       .filter((name) => !mentionsWithQuestion(toolsSection, name))

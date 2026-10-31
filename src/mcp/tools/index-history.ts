@@ -290,8 +290,6 @@ export function registerIndexHistoryTools(server: McpServer, env: Env, auth: Aut
     server,
     {
       name: "get_index_history",
-      description:
-        "Get stored end-of-day closes of one EGX index (EGX30, EGX30CAPPED, EGX70EWI, EGX100EWI, EGX30USD) for up to 5 years, daily, weekly or monthly, at most 500 points.",
       inputSchema: historyInputSchema,
       outputSchema: historyOutputSchema,
       readOnly: true,
@@ -304,8 +302,6 @@ export function registerIndexHistoryTools(server: McpServer, env: Env, auth: Aut
     server,
     {
       name: "get_index_summary",
-      description:
-        "Summarize up to 5 EGX indices from stored end-of-day closes: latest close, daily change, period high, low and return, 20 and 50 session averages, annualized volatility, drawdown from the period high and 5 session return, with the index of highest period return.",
       inputSchema: summaryInputSchema,
       outputSchema: summaryOutputSchema,
       readOnly: true,

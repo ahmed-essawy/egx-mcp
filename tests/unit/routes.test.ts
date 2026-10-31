@@ -1,14 +1,17 @@
 import { env } from "cloudflare:workers";
 import { describe, expect, it } from "vitest";
-import { privacyView, termsView } from "../../src/http/legal";
 import { defaultHandler } from "../../src/http/routes";
+import { pageByPath } from "../../src/site/pages";
+import { renderPageHtml } from "../../src/site/render-html";
 import { ICON_LINKS, SITE_HEADER } from "../helpers/html";
+import { TEST_CONTEXT } from "../helpers/site";
 
 const ORIGIN = "https://egx.example.com";
 const SERVER_ERROR = 500;
 const NOT_FOUND = 404;
 const PNG_SIGNATURE = [137, 80, 78, 71, 13, 10, 26, 10];
 const ICON_CACHE_CONTROL = "public, max-age=86400";
+const PUBLIC_CACHE_CONTROL = "public, max-age=3600";
 const CSS_CACHE_CONTROL = "public, max-age=300";
 const ANY_ORIGIN = "*";
 const HTML_CSP = "default-src 'self'; frame-ancestors 'none'";
@@ -42,6 +45,12 @@ function pngSize(bytes: Uint8Array): [number, number] {
   return [view.getUint32(WIDTH_OFFSET), view.getUint32(HEIGHT_OFFSET)];
 }
 
+function renderPath(path: string): string {
+  const page = pageByPath(path);
+  if (page === undefined) throw new Error(`missing page ${path}`);
+  return renderPageHtml(page, TEST_CONTEXT);
+}
+
 function envWith(origin: string): Env {
   return { ...env, PUBLIC_ORIGIN: origin } as unknown as Env;
 }
@@ -57,7 +66,7 @@ describe("defaultHandler", () => {
     expect(response.status).toBe(200);
     expect(response.headers.get("content-type")).toContain("text/html");
     expect(response.headers.get("content-security-policy")).toBe(HTML_CSP);
-    expect(response.headers.get("cache-control")).toBe("no-store");
+    expect(response.headers.get("cache-control")).toBe(PUBLIC_CACHE_CONTROL);
     expect(response.headers.get("set-cookie")).toBeNull();
     const body = await response.text();
     expect(body).toContain("<code>https://egx.configured.test/mcp</code>");
@@ -152,19 +161,19 @@ describe("defaultHandler", () => {
   });
 
   it.each([
-    ["/privacy", privacyView, "<h1>Privacy policy</h1>"],
-    ["/terms", termsView, "<h1>Terms of use</h1>"],
-  ])("serves %s as HTML with the security headers and no cookie", async (path, view, heading) => {
-    const response = await call(path);
+    ["/privacy", "<h1>Privacy policy</h1>"],
+    ["/terms", "<h1>Terms of use</h1>"],
+  ])("serves %s as HTML with the security headers and no cookie", async (path, heading) => {
+    const response = await call(path, "GET", envWith(TEST_CONTEXT.origin));
     expect(response.status).toBe(200);
     expect(response.headers.get("content-type")).toBe("text/html; charset=utf-8");
     expect(response.headers.get("content-security-policy")).toBe("default-src 'self'; frame-ancestors 'none'");
     expect(response.headers.get("x-content-type-options")).toBe("nosniff");
     expect(response.headers.get("referrer-policy")).toBe("same-origin");
-    expect(response.headers.get("cache-control")).toBe("no-store");
+    expect(response.headers.get("cache-control")).toBe(PUBLIC_CACHE_CONTROL);
     expect(response.headers.get("set-cookie")).toBeNull();
     const body = await response.text();
-    expect(body).toBe(view());
+    expect(body).toBe(renderPath(path));
     expect(body).toContain(heading);
     expect(body).toContain(SITE_HEADER);
     expect(body).toContain(ICON_LINKS);

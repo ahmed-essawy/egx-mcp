@@ -1,11 +1,11 @@
-import { DATA_SOURCES, PRIVACY_LINK, TERMS_LINK, page } from "./views";
+import { DATA_SOURCES, PRIVACY_LINK, TERMS_LINK } from "./views";
 
 export const LEGAL_LAST_UPDATED = "2026-10-28";
 export const OPERATOR_NAME = "Ahmed M. Essawy";
 export const CONTACT_EMAIL = "ahm.elessawy@gmail.com";
 export const GOVERNING_LAW_TEXT = "These terms do not limit rights you have under mandatory laws where you live.";
 
-type LegalSection = { id: string; title: string; paragraphs: string[] };
+export type LegalSection = { id: string; title: string; paragraphs: string[] };
 
 const CONTACT_LINK = `<a href="mailto:${CONTACT_EMAIL}">${CONTACT_EMAIL}</a>`;
 
@@ -17,9 +17,9 @@ ${body}
 </section>`;
 }
 
-function legalPage(title: string, sections: LegalSection[]): string {
+export function legalBody(title: string, sections: readonly LegalSection[]): string {
   const body = sections.map(section).join("\n");
-  return page(title, `<h1>${title}</h1>\n<p>Last updated: ${LEGAL_LAST_UPDATED}</p>\n${body}`);
+  return `<h1>${title}</h1>\n<p>Last updated: ${LEGAL_LAST_UPDATED}</p>\n${body}`;
 }
 
 function contactSection(): LegalSection {
@@ -30,7 +30,7 @@ function contactSection(): LegalSection {
   };
 }
 
-const PRIVACY_SECTIONS: LegalSection[] = [
+export const PRIVACY_SECTIONS: LegalSection[] = [
   {
     id: "operator",
     title: "Who runs this service",
@@ -119,7 +119,7 @@ const PRIVACY_SECTIONS: LegalSection[] = [
   contactSection(),
 ];
 
-const TERMS_SECTIONS: LegalSection[] = [
+export const TERMS_SECTIONS: LegalSection[] = [
   {
     id: "acceptance",
     title: "Acceptance",
@@ -196,11 +196,3 @@ const TERMS_SECTIONS: LegalSection[] = [
   },
   contactSection(),
 ];
-
-export function privacyView(): string {
-  return legalPage("Privacy policy", PRIVACY_SECTIONS);
-}
-
-export function termsView(): string {
-  return legalPage("Terms of use", TERMS_SECTIONS);
-}

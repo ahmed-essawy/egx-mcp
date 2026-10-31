@@ -446,8 +446,6 @@ export function registerAdminTools(server: McpServer, env: Env, auth: AuthProps)
     server,
     {
       name: "admin",
-      description:
-        "Owner only. Manage notices, the holiday and special hours table, inflation figures, corporate actions and bonus, split and reverse split ratios, usage and pending symbols. activate_symbol does not rewrite the symbol directory; the next end-of-day run does.",
       inputSchema,
       outputSchema,
       readOnly: false,

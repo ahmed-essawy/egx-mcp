@@ -104,3 +104,8 @@ An MCP client that shows server icons (for example in its connector list) shows 
 - The EGX MCP logo is final; a later replacement regenerates the six constants with the command in plan.md, Amendment 1.
 - The owner uploads `google-oauth-logo-120.png` to the Google OAuth consent screen; nothing in the code refers to it.
 - `websiteUrl` on `serverInfo` is not added (not requested).
+
+## Amendment 2 (spec 006, 2026-10-31): preview image and header link
+
+- The image table gains `/og-image.png`: 1200 by 630 PNG, `image/png`, same image headers as the other image routes. It is referenced only by the social tags of the public pages; it is not in the head icon links and not in the MCP `serverInfo.icons`.
+- The header brand link points at the home page of the page language: `/` on English pages, and the Arabic home on Arabic pages (spec 006 Phase 7, pending).

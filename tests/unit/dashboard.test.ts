@@ -382,7 +382,7 @@ describe("dashboard routes without a database", () => {
 
   describe("html headers", () => {
     it("sends Referrer-Policy same-origin and Cache-Control no-store on HTML", async () => {
-      const response = await call(new Request(`${ORIGIN}/`), envWith());
+      const response = await call(new Request(`${ORIGIN}/no-such-page`), envWith());
 
       expect(response.headers.get("referrer-policy")).toBe("same-origin");
       expect(response.headers.get("cache-control")).toBe("no-store");

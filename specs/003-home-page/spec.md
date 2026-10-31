@@ -74,3 +74,15 @@ FR-H02 to FR-H07 are replaced by the following. FR-H01 and FR-H08 to FR-H09 stay
 ## Amendment 2 (2026-10-28): connect note after OAuth sign-in
 
 FR-H03 line is now: "Claude, ChatGPT and Cursor connect with Google sign-in or with an API key header. Create your key after signing in." The Independent Test and the client wording assumption follow this line (T130).
+
+## Amendment 3 (spec 006, 2026-10-31): public caching, examples and learn-more links
+
+Owner decisions from spec 006 (search and AI discoverability) amend these requirements:
+
+- **FR-H01**: `no-store` becomes the public header set (`cache-control: public, max-age=3600`, `etag`, `vary: Accept`, Markdown `link`). The CSP, `nosniff`, `same-origin` and the absence of `set-cookie` stay. Still no D1, KV or upstream read.
+- **FR-H03**: the connect note line is now: "Claude and ChatGPT connect with Google sign-in, Claude Code with either, and Cursor with an API key header. Create your key after signing in." It matches the Claude Code guide (Google sign-in or an API key header), the Cursor guide and the questions page, Q7 (wording only; approved by the owner on 2026-10-31).
+- **FR-H05**: exactly 5 example questions and a "Learn more" links section are allowed on the home page. The tool list stays off the home page.
+- **FR-H06**: the shared footer links every main page (Home, Tools, the four connect guides, Questions, Data and limits, Privacy policy, Terms of use) and GitHub.
+- **FR-H08**: the accessibility rules apply to every section of the page.
+- **FR-H09**: exactly one `<script type="application/ld+json">` data block is allowed. Executable script, inline style and `<style>` stay forbidden.
+- **Title**: the `<title>` is "EGX MCP: Egyptian Exchange data for AI assistants".

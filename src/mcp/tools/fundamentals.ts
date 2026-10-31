@@ -260,8 +260,6 @@ function registerGetCompanyProfile(server: McpServer, env: Env, auth: AuthProps)
     server,
     {
       name: "get_company_profile",
-      description:
-        "Get the profile of an Egyptian listed company by ticker, ISIN, or Arabic or English name: sector, market, shares outstanding, free float and first trade date.",
       inputSchema: z.object({ symbol: symbolInputSchema }),
       outputSchema: profileOutputSchema,
       readOnly: true,
@@ -302,8 +300,6 @@ function registerGetDividends(server: McpServer, env: Env, auth: AuthProps): voi
     server,
     {
       name: "get_dividends",
-      description:
-        "Get cash dividends by ex-dividend date for one Egyptian stock, or for every company when no symbol is given. The default range is today through the next 90 days.",
       inputSchema: dividendsInputSchema,
       outputSchema: actionsOutputSchema,
       readOnly: true,
@@ -330,8 +326,6 @@ function registerGetCorporateActions(server: McpServer, env: Env, auth: AuthProp
     server,
     {
       name: "get_corporate_actions",
-      description:
-        "Get every corporate action of one Egyptian stock (dividends, bonus shares, splits, rights and others) with its ex-date, optionally from a given date.",
       inputSchema: actionsInputSchema,
       outputSchema: actionsOutputSchema,
       readOnly: true,
@@ -357,8 +351,6 @@ function registerGetFinancials(server: McpServer, env: Env, auth: AuthProps): vo
     server,
     {
       name: "get_financials",
-      description:
-        "Get the stored financial figures of one Egyptian stock with P/E, P/B and dividend yield computed from the current price, each showing its inputs or why it cannot be computed.",
       inputSchema: z.object({ symbol: symbolInputSchema }),
       outputSchema: financialsOutputSchema,
       readOnly: true,

@@ -14,7 +14,7 @@ import { registerSearchTools } from "./tools/search";
 export { defineTool, type ToolContext, type ToolDefinition } from "./define-tool";
 
 const SERVER_NAME = "egx-mcp";
-const SERVER_VERSION = "1.0.0";
+export const SERVER_VERSION = "1.0.0";
 
 export function createServer(env: Env, auth: AuthProps, icons: Icon[]): McpServer {
   const server = new McpServer({ name: SERVER_NAME, version: SERVER_VERSION, icons }, { capabilities: { tools: {} } });

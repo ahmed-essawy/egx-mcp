@@ -78,6 +78,8 @@ describe("authorizeHandler", () => {
     expect(response.status).toBe(200);
     expect(response.headers.get("x-frame-options")).toBe("DENY");
     expect(response.headers.get("content-security-policy")).toBe("default-src 'self'; frame-ancestors 'none'");
+    expect(response.headers.get("x-robots-tag")).toBe("noindex, nofollow");
+    expect(response.headers.get("cache-control")).toBe("no-store");
     expect(response.headers.get("content-type")).toBe("text/html; charset=utf-8");
     expect(response.headers.getSetCookie()).toEqual([BINDING_COOKIE]);
   });

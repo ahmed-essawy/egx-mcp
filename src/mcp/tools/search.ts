@@ -83,7 +83,6 @@ export function registerSearchTools(server: McpServer, env: Env, auth: AuthProps
     server,
     {
       name: "search",
-      description: "Find Egyptian stocks and mutual funds by ticker, ISIN, or Arabic or English name.",
       inputSchema,
       outputSchema,
       readOnly: true,

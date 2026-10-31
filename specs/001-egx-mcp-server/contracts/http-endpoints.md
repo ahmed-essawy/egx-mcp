@@ -22,9 +22,9 @@ Session: HMAC-SHA-256 signed cookie `__Host-egx_session` (`user id`, `exp` 12 h)
 
 | Method and path | Behavior |
 |---|---|
-| `GET /` | Public home page (spec 003, amendment 1): "EGX MCP", one sentence, a "Sign in" button (`/dashboard`) with "By signing in you agree to the Terms of use and acknowledge the Privacy policy" (both linked); a "Connect your assistant" block showing the MCP address `<origin>/mcp` (origin from `PUBLIC_ORIGIN`, or the request origin when it is empty; `500` when it is invalid) and `Authorization: Bearer <your key>`; one notice that data is delayed, unofficial and not advice, with the sources (the independence sentence is in the site header, spec 005). No D1 or KV read, no cookie. The only external link is the GitHub link in the footer |
-| `GET /privacy` | Public static privacy policy (spec 002, FR-L03). No session, no cookies, no D1 or KV read. Other methods `404` |
-| `GET /terms` | Public static terms of use (spec 002, FR-L04). No session, no cookies, no D1 or KV read. Other methods `404` |
+| `GET /`, `HEAD /` | Public home page (spec 003, amendments 1 to 3; spec 006): "EGX MCP", one sentence, a "Sign in" button (`/dashboard`) with "By signing in you agree to the Terms of use and acknowledge the Privacy policy" (both linked); 5 example questions; a "Connect your assistant" block showing the MCP address `<origin>/mcp` (origin from `PUBLIC_ORIGIN`, or the request origin when it is empty; `500` when it is invalid) and `Authorization: Bearer <your key>`; a "Learn more" links section; one notice that data is delayed, unofficial and not advice, with the sources (the independence sentence is in the site header, spec 005). Public headers (see Public site below). No D1 or KV read, no cookie |
+| `GET /privacy`, `HEAD /privacy` | Public static privacy policy (spec 002, FR-L03; headers per spec 006). No session, no cookies, no D1 or KV read. Other methods `404` |
+| `GET /terms`, `HEAD /terms` | Public static terms of use (spec 002, FR-L04; headers per spec 006). No session, no cookies, no D1 or KV read. Other methods `404` |
 | `GET /favicon-32.png`, `/apple-touch-icon.png`, `/icon-192.png`, `/icon-512.png`, `/logo-96.png` | PNG 32, 180, 192, 512, 96 px, `image/png`, `public, max-age=86400`, `nosniff`, `Access-Control-Allow-Origin: *`, no HTML CSP, no cookie, no D1 or KV read. Other methods 404 (spec 005, Amendment 1; image headers per spec 007) |
 | `GET /favicon.ico` | ICO with 16, 32, 48 px, `image/x-icon`, same cache and image headers, no cookie, no D1 or KV read. Other methods 404 (spec 005, Amendment 1; image headers per spec 007) |
 | `GET /dashboard/login` | Redirect to Google (state cookie, PKCE) |
@@ -35,9 +35,28 @@ Session: HMAC-SHA-256 signed cookie `__Host-egx_session` (`user id`, `exp` 12 h)
 | `POST /dashboard/account/delete` | Confirm field must equal the user's email; deletes the account (FR-036), revokes OAuth grants, clears the cookie |
 | `POST /dashboard/logout` | Clears the cookie |
 
-All HTML responses carry `Content-Security-Policy: default-src 'self'; frame-ancestors 'none'`, `X-Content-Type-Options: nosniff`, `Cache-Control: no-store` (the one-time plaintext key must not be cached; `/styles.css` is static and keeps `Cache-Control: public, max-age=300`), `Referrer-Policy: same-origin` (a stricter `no-referrer` would make browsers send `Origin: null` on form POSTs, and `checkPost` would refuse every dashboard POST). Pages meet WCAG 2.2 AA (labels, focus order, contrast). Every HTML page ends with a footer `<nav aria-label="Site">` linking `/`, `/privacy`, `/terms` and the GitHub repository; the consent page also carries the "By authorizing you agree ..." sentence with both links (spec 002).
+All private HTML responses (dashboard, sign-in, consent, OAuth guard refusals, error and not found pages) carry `Content-Security-Policy: default-src 'self'; frame-ancestors 'none'`, `X-Content-Type-Options: nosniff`, `X-Robots-Tag: noindex, nofollow`, `Cache-Control: no-store` (the one-time plaintext key must not be cached; `/styles.css` is static and keeps `Cache-Control: public, max-age=300`), `Referrer-Policy: same-origin` (a stricter `no-referrer` would make browsers send `Origin: null` on form POSTs, and `checkPost` would refuse every dashboard POST). Pages meet WCAG 2.2 AA (labels, focus order, contrast). Every HTML page ends with a footer `<nav aria-label="Site">` linking Home, Tools, the four connect guides, Questions, Data and limits, Privacy policy, Terms of use and the GitHub repository (spec 006); the consent page also carries the "By authorizing you agree ..." sentence with both links (spec 002).
 
 The MCP `initialize` result lists `serverInfo.icons`: the 32, 192 and 512 px PNGs on the public origin (spec 005, Amendment 1).
+
+## Public site (spec 006, search and AI discoverability)
+
+Detail in `specs/006-seo-ai-discoverability/contracts/routes.md`. All routes below are served by `defaultHandler` (`src/http/public.ts`) except `GET /mcp/server-card`, which `src/index.ts` answers before the OAuth guard and the provider (the provider owns every `/mcp/...` path). None reads D1, KV or an upstream, calls the rate limiter or sets a cookie. Only `GET` and `HEAD` are answered (the image route answers `GET`); other methods get `404`, except that `/mcp/server-card` and `/.well-known/ai-catalog.json` also answer `OPTIONS` with `204` and the discovery CORS header set.
+
+| Method and path | Behavior |
+|---|---|
+| `GET`, `HEAD` `/`, `/tools`, `/connect/claude`, `/connect/chatgpt`, `/connect/claude-code`, `/connect/cursor`, `/faq`, `/data`, `/privacy`, `/terms` | HTML, `cache-control: public, max-age=3600`, `etag`, `vary: Accept`, `link` to the Markdown twin, the three existing security headers, no `x-robots-tag`. `If-None-Match` gives `304`. An `Accept` that prefers `text/markdown` or `text/plain` gets the Markdown twin |
+| `GET`, `HEAD` `/index.md`, `/tools.md`, `/connect/claude.md`, `/connect/chatgpt.md`, `/connect/claude-code.md`, `/connect/cursor.md`, `/faq.md`, `/data.md`, `/privacy.md`, `/terms.md` | Markdown twin, `text/markdown; charset=utf-8`, same cache headers, `link` canonical to the HTML page |
+| `GET`, `HEAD` `/ar`, `/ar/tools`, `/ar/faq`, `/ar/data` and their `.md` twins (`/ar.md` for the Arabic home) | (spec 006 Phase 7, pending) |
+| `GET`, `HEAD` `/robots.txt` | Crawler rules, `text/plain` |
+| `GET`, `HEAD` `/sitemap.xml` | Sitemap, `application/xml` |
+| `GET`, `HEAD` `/llms.txt`, `/llms-full.txt` | Site summary and full content, `text/plain` |
+| `GET`, `HEAD` `/.well-known/ai-catalog.json` | AI catalog, `application/ai-catalog+json`, discovery CORS headers |
+| `GET`, `HEAD` `/mcp/server-card` | MCP server card, `application/mcp-server-card+json`, discovery CORS headers; answered in `src/index.ts` before the provider |
+| `GET`, `HEAD` `/c60c57998197b5e5b4a9fc2f935a3c44.txt` | IndexNow key file, the key with no newline, `text/plain` |
+| `GET` `/og-image.png` | 1200 by 630 PNG preview image, `image/png`, `public, max-age=86400`, image headers of spec 007 (spec 005, Amendment 2) |
+
+Text files and Markdown twins carry `x-content-type-options: nosniff` and an `etag`, with no CSP and no cookie. A path that differs from a public page or twin only by case or trailing slash answers `301` to the canonical path (query dropped); any other unknown path answers the private `404` page.
 
 ## Scheduled (cron, UTC)
 
