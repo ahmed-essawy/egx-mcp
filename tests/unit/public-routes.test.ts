@@ -4,7 +4,12 @@ import { defaultHandler } from "../../src/http/routes";
 import worker from "../../src/index";
 import { robotsTxt, sitemapXml } from "../../src/site/crawl";
 import { aiCatalog } from "../../src/site/discovery";
-import { INDEXNOW_KEY_PATH, SITE } from "../../src/site/identity";
+import {
+  INDEXNOW_KEY_PATH,
+  SEARCH_CONSOLE_VERIFICATION_BODY,
+  SEARCH_CONSOLE_VERIFICATION_PATH,
+  SITE,
+} from "../../src/site/identity";
 import { PAGES } from "../../src/site/pages";
 import {
   AI_CATALOG_PATH,
@@ -268,6 +273,32 @@ describe("text and discovery files", () => {
     expect(await response.text()).toBe(SITE.indexNowKey);
   });
 
+  it("serves the Search Console verification file as HTML with the exact body and no trailing newline", async () => {
+    const response = await call(SEARCH_CONSOLE_VERIFICATION_PATH);
+    const body = await response.text();
+
+    expect(SEARCH_CONSOLE_VERIFICATION_PATH).toBe("/google8bdb3ebfbb167b7e.html");
+    expect(response.status).toBe(200);
+    expect(response.headers.get("content-type")).toBe(HTML_CONTENT_TYPE);
+    expect(response.headers.get("x-content-type-options")).toBe("nosniff");
+    expect(response.headers.get("cache-control")).toBe(PUBLIC_CACHE_CONTROL);
+    expect(response.headers.get("content-security-policy")).toBe(HTML_CSP);
+    expect(response.headers.get("referrer-policy")).toBe("same-origin");
+    expect(response.headers.get("set-cookie")).toBeNull();
+    expect(body).toBe("google-site-verification: google8bdb3ebfbb167b7e.html");
+    expect(body).toBe(SEARCH_CONSOLE_VERIFICATION_BODY);
+    expect(body.endsWith("\n")).toBe(false);
+  });
+
+  it("keeps the Search Console verification file out of the sitemap, llms.txt and llms-full.txt", () => {
+    const ctx = configuredContext();
+
+    for (const text of [sitemapXml(ctx), llmsTxt(ctx), llmsFullTxt(ctx)]) {
+      expect(text).not.toContain(SEARCH_CONSOLE_VERIFICATION_PATH);
+    }
+    expect(PAGES.map((page) => page.path)).not.toContain(SEARCH_CONSOLE_VERIFICATION_PATH);
+  });
+
   it("answers 500 for a text file when the configured origin is invalid", async () => {
     expect((await call(LLMS_PATH, "GET", envWith("ftp://egx.example.com"))).status).toBe(500);
   });
@@ -286,6 +317,7 @@ const CONDITIONAL_PATHS = [
   LLMS_FULL_PATH,
   AI_CATALOG_PATH,
   INDEXNOW_KEY_PATH,
+  SEARCH_CONSOLE_VERIFICATION_PATH,
   SERVER_CARD_PATH,
 ];
 

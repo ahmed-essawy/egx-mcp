@@ -6,7 +6,7 @@ No database table, KV key, binding or migration is added. Every entity below is 
 
 | Module | Holds | Imports (only) |
 |---|---|---|
-| `src/site/identity.ts` | `SITE` (site identity), `RATE_LIMIT_PER_MINUTE`, `INDEXNOW_KEY_PATH` | nothing |
+| `src/site/identity.ts` | `SITE` (site identity), `RATE_LIMIT_PER_MINUTE`, `INDEXNOW_KEY_PATH`, `SEARCH_CONSOLE_VERIFICATION_PATH`, `SEARCH_CONSOLE_VERIFICATION_BODY` | nothing |
 | `src/site/paths.ts` | every public path constant, `markdownPath(path)`, `FOOTER_LINKS` | `./identity` |
 | `src/mcp/tool-descriptions.ts` | `TOOL_DESCRIPTIONS` | `./tool-names`, `../store/d1/personal` (`MAX_ITEMS_PER_USER`), `../store/d1/events` (`MAX_SINCE_AGE_DAYS`) |
 | `src/site/content-model.ts` | `Inline`, `Block`, `Section`, `PageContent`, `SiteContext` types | `./paths` (type of path) |
@@ -42,6 +42,7 @@ type SiteIdentity = {
   readonly previewImageWidth: number;
   readonly previewImageHeight: number;
   readonly indexNowKey: string;
+  readonly searchConsoleToken: string;
   readonly transportLabel: string;
   readonly signInMethods: string;
   readonly dataLimits: string;
@@ -201,6 +202,7 @@ Lives in `tests/unit/site-freshness.test.ts` as `CONTENT_PINS`. The hash is SHA-
 | Server card | `serverCard(ctx)` | `application/mcp-server-card+json` |
 | AI catalog | `aiCatalog(ctx)` | `application/ai-catalog+json` |
 | IndexNow key | `SITE.indexNowKey` | `text/plain; charset=utf-8` |
+| Search Console verification file | `google-site-verification: ` + `SITE.searchConsoleToken` + `.html` | `text/html; charset=utf-8` |
 | Preview image | `ICONS.get(PREVIEW_IMAGE_PATH)` | `image/png` |
 
 Exact formats: contracts/.

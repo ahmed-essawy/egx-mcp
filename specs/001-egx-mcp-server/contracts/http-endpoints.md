@@ -54,6 +54,7 @@ Detail in `specs/006-seo-ai-discoverability/contracts/routes.md`. All routes bel
 | `GET`, `HEAD` `/.well-known/ai-catalog.json` | AI catalog, `application/ai-catalog+json`, discovery CORS headers |
 | `GET`, `HEAD` `/mcp/server-card` | MCP server card, `application/mcp-server-card+json`, discovery CORS headers; answered in `src/index.ts` before the provider |
 | `GET`, `HEAD` `/c60c57998197b5e5b4a9fc2f935a3c44.txt` | IndexNow key file, the key with no newline, `text/plain` |
+| `GET`, `HEAD` `/google8bdb3ebfbb167b7e.html` | Google Search Console verification file, body `google-site-verification: google8bdb3ebfbb167b7e.html` with no newline, `text/html; charset=utf-8`; carries the public HTML security headers (CSP, `referrer-policy: same-origin`, nosniff) and an `etag`; not a page, not in the sitemap or llms.txt |
 | `GET` `/og-image.png` | 1200 by 630 PNG preview image, `image/png`, `public, max-age=86400`, image headers of spec 007 (spec 005, Amendment 2) |
 
 Text files and Markdown twins carry `x-content-type-options: nosniff` and an `etag`, with no CSP and no cookie. A path that differs from a public page or twin only by case or trailing slash answers `301` to the canonical path (query dropped); any other unknown path answers the private `404` page.

@@ -3,7 +3,12 @@ import { loadConfig, resolvePublicOrigin } from "../config";
 import type { SiteContext } from "../site/content-model";
 import { robotsTxt, sitemapXml } from "../site/crawl";
 import { aiCatalog, serverCard } from "../site/discovery";
-import { INDEXNOW_KEY_PATH, SITE } from "../site/identity";
+import {
+  INDEXNOW_KEY_PATH,
+  SEARCH_CONSOLE_VERIFICATION_BODY,
+  SEARCH_CONSOLE_VERIFICATION_PATH,
+  SITE,
+} from "../site/identity";
 import { PAGES, type PublicPage } from "../site/pages";
 import {
   AI_CATALOG_PATH,
@@ -25,6 +30,7 @@ const PUBLIC_CACHE_CONTROL = "public, max-age=3600";
 const REDIRECT_CACHE_CONTROL = "public, max-age=86400";
 const MARKDOWN_CONTENT_TYPE = "text/markdown; charset=utf-8";
 const PLAIN_CONTENT_TYPE = "text/plain; charset=utf-8";
+const HTML_CONTENT_TYPE = "text/html; charset=utf-8";
 const XML_CONTENT_TYPE = "application/xml; charset=utf-8";
 const CATALOG_CONTENT_TYPE = "application/ai-catalog+json";
 const SERVER_CARD_CONTENT_TYPE = "application/mcp-server-card+json";
@@ -196,6 +202,9 @@ export const PUBLIC_ROUTES: readonly Route[] = [
   ),
   { method: PREFLIGHT_METHOD, pattern: exactPath(AI_CATALOG_PATH), handler: preflightResponse },
   ...contextRoute(INDEXNOW_KEY_PATH, (_ctx, request) => textResponse(request, SITE.indexNowKey, PLAIN_CONTENT_TYPE)),
+  ...contextRoute(SEARCH_CONSOLE_VERIFICATION_PATH, (_ctx, request) =>
+    textResponse(request, SEARCH_CONSOLE_VERIFICATION_BODY, HTML_CONTENT_TYPE, SECURITY_HEADERS),
+  ),
 ];
 
 const CANONICAL_PATHS: ReadonlySet<string> = new Set(PAGES.flatMap((page) => [page.path, markdownPath(page.path)]));

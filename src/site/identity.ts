@@ -16,6 +16,7 @@ export type SiteIdentity = {
   readonly previewImageWidth: number;
   readonly previewImageHeight: number;
   readonly indexNowKey: string;
+  readonly searchConsoleToken: string;
   readonly transportLabel: string;
   readonly signInMethods: string;
   readonly dataLimits: string;
@@ -69,6 +70,7 @@ export const SITE: SiteIdentity = {
   previewImageWidth: 1200,
   previewImageHeight: 630,
   indexNowKey: "c60c57998197b5e5b4a9fc2f935a3c44",
+  searchConsoleToken: "google8bdb3ebfbb167b7e",
   transportLabel: "Streamable HTTP",
   signInMethods: "Google sign-in (OAuth) or an API key sent as `Authorization: Bearer <your key>`",
   dataLimits:
@@ -78,6 +80,11 @@ export const SITE: SiteIdentity = {
 export const RATE_LIMIT_PER_MINUTE = 10;
 
 export const INDEXNOW_KEY_PATH = `/${SITE.indexNowKey}.txt`;
+
+const SEARCH_CONSOLE_FILE_NAME = `${SITE.searchConsoleToken}.html`;
+
+export const SEARCH_CONSOLE_VERIFICATION_PATH = `/${SEARCH_CONSOLE_FILE_NAME}`;
+export const SEARCH_CONSOLE_VERIFICATION_BODY = `google-site-verification: ${SEARCH_CONSOLE_FILE_NAME}`;
 
 export const LOCALIZED: Readonly<Record<Lang, LocalizedText>> = {
   en: {

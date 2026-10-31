@@ -2,7 +2,7 @@ import { env } from "cloudflare:workers";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ICONS } from "../../src/http/icons";
 import worker from "../../src/index";
-import { INDEXNOW_KEY_PATH } from "../../src/site/identity";
+import { INDEXNOW_KEY_PATH, SEARCH_CONSOLE_VERIFICATION_PATH } from "../../src/site/identity";
 import { PAGES } from "../../src/site/pages";
 import {
   AI_CATALOG_PATH,
@@ -61,6 +61,7 @@ const READABLE_PATHS = [
   LLMS_PATH,
   LLMS_FULL_PATH,
   INDEXNOW_KEY_PATH,
+  SEARCH_CONSOLE_VERIFICATION_PATH,
   AI_CATALOG_PATH,
   SERVER_CARD_PATH,
 ];

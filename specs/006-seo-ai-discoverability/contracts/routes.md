@@ -20,6 +20,7 @@ All routes below are served by `defaultHandler` (`src/http/routes.ts` spreading 
 | GET, HEAD | `/.well-known/ai-catalog.json` | AI catalog | `application/ai-catalog+json` | same | T, X |
 | GET, HEAD | `/mcp/server-card` | server card | `application/mcp-server-card+json` | same | T, X |
 | GET, HEAD | `/c60c57998197b5e5b4a9fc2f935a3c44.txt` | the key, no newline | `text/plain; charset=utf-8` | same | T |
+| GET, HEAD | `/google8bdb3ebfbb167b7e.html` | Search Console verification file, body `google-site-verification: google8bdb3ebfbb167b7e.html` with no newline, not a page and not listed in the sitemap or llms.txt | `text/html; charset=utf-8` | same | P |
 | GET (like every image route) | `/og-image.png` | 1200 by 630 PNG | `image/png` | `public, max-age=86400` | the image headers of spec 007 (same as the other icon routes) |
 
 Header sets:
